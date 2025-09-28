@@ -17,7 +17,7 @@ All colors MUST be HSL.
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
 
-    --primary: 222.2 47.4% 11.2%;
+    --primary: 217 92% 60%;
     --primary-foreground: 210 40% 98%;
 
     --secondary: 210 40% 96.1%;
@@ -101,5 +101,18 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+  }
+
+  /* Mobile optimizations */
+  input, select, textarea {
+    font-size: 16px;
+  }
+  
+  button, a, input, select, textarea {
+    @apply touch-manipulation;
+  }
+  
+  html {
+    -webkit-text-size-adjust: 100%;
   }
 }

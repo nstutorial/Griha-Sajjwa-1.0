@@ -1,0 +1,195 @@
+import { useState, useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { Navigate } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { supabase } from '@/integrations/supabase/client';
+import { 
+  Wallet, 
+  TrendingUp, 
+  Users, 
+  DollarSign, 
+  Plus,
+  LogOut,
+  CreditCard,
+  Banknote
+} from 'lucide-react';
+import ExpensesList from '@/components/ExpensesList';
+import AddExpenseDialog from '@/components/AddExpenseDialog';
+import LoansList from '@/components/LoansList';
+import AddLoanDialog from '@/components/AddLoanDialog';
+import CustomersList from '@/components/CustomersList';
+import AddCustomerDialog from '@/components/AddCustomerDialog';
+
+interface DashboardStats {
+  totalExpenses: number;
+  totalLoaned: number;
+  totalReceived: number;
+  activeLoans: number;
+}
+
+const Dashboard = () => {
+  const { user, signOut } = useAuth();
+  const [stats, setStats] = useState<DashboardStats>({
+    totalExpenses: 0,
+    totalLoaned: 0,
+    totalReceived: 0,
+    activeLoans: 0,
+  });
+  const [activeTab, setActiveTab] = useState('expenses');
+  
+  if (!user) {
+    return <Navigate to="/auth" replace />;
+  }
+
+  useEffect(() => {
+    fetchStats();
+  }, [user]);
+
+  const fetchStats = async () => {
+    if (!user) return;
+
+    try {
+      // Get total expenses
+      const { data: expenses } = await supabase
+        .from('expenses')
+        .select('amount')
+        .eq('user_id', user.id);
+      
+      const totalExpenses = expenses?.reduce((sum, exp) => sum + Number(exp.amount), 0) || 0;
+
+      // Get loans data
+      const { data: loans } = await supabase
+        .from('loans')
+        .select('principal_amount, is_active')
+        .eq('user_id', user.id);
+      
+      const totalLoaned = loans?.reduce((sum, loan) => sum + Number(loan.principal_amount), 0) || 0;
+      const activeLoans = loans?.filter(loan => loan.is_active).length || 0;
+
+      // Get total received from loan transactions
+      const { data: transactions } = await supabase
+        .from('loan_transactions')
+        .select('amount, loans!inner(user_id)')
+        .eq('loans.user_id', user.id);
+      
+      const totalReceived = transactions?.reduce((sum, trans) => sum + Number(trans.amount), 0) || 0;
+
+      setStats({
+        totalExpenses,
+        totalLoaned,
+        totalReceived,
+        activeLoans,
+      });
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <div className="border-b bg-card">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <Wallet className="h-8 w-8 text-primary" />
+              <h1 className="text-2xl font-bold">Expense Tracker</h1>
+            </div>
+            <Button variant="outline" onClick={signOut}>
+              <LogOut className="h-4 w-4 mr-2" />
+              Sign Out
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <div className="container mx-auto px-4 py-6">
+        {/* Stats Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
+              <TrendingUp className="h-4 w-4 text-destructive" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-destructive">
+                ₹{stats.totalExpenses.toFixed(2)}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Loaned</CardTitle>
+              <DollarSign className="h-4 w-4 text-orange-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-orange-600">
+                ₹{stats.totalLoaned.toFixed(2)}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Received</CardTitle>
+              <TrendingUp className="h-4 w-4 text-green-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600">
+                ₹{stats.totalReceived.toFixed(2)}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Active Loans</CardTitle>
+              <Users className="h-4 w-4 text-primary" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.activeLoans}</div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Main Content */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="expenses">Expenses</TabsTrigger>
+            <TabsTrigger value="loans">Loans</TabsTrigger>
+            <TabsTrigger value="customers">Customers</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="expenses" className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-semibold">Your Expenses</h2>
+              <AddExpenseDialog onExpenseAdded={fetchStats} />
+            </div>
+            <ExpensesList />
+          </TabsContent>
+
+          <TabsContent value="loans" className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-semibold">Loans & Lending</h2>
+              <AddLoanDialog onLoanAdded={fetchStats} />
+            </div>
+            <LoansList onUpdate={fetchStats} />
+          </TabsContent>
+
+          <TabsContent value="customers" className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-semibold">Customers</h2>
+              <AddCustomerDialog />
+            </div>
+            <CustomersList />
+          </TabsContent>
+        </Tabs>
+      </div>
+    </div>
+  );
+};
+
+export default Dashboard;
