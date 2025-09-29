@@ -73,6 +73,21 @@ const CustomersList = () => {
         return;
       }
 
+      // Check if customer has any transactions
+      const { data: transactions } = await supabase
+        .from('loan_transactions')
+        .select('id, loan:loans!inner(customer_id)')
+        .eq('loan.customer_id', id);
+
+      if (transactions && transactions.length > 0) {
+        toast({
+          variant: "destructive",
+          title: "Cannot delete customer",
+          description: "Customer has transaction history. Cannot delete customer with transactions.",
+        });
+        return;
+      }
+
       const { error } = await supabase
         .from('customers')
         .delete()

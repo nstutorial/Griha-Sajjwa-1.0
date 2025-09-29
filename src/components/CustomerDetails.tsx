@@ -42,6 +42,7 @@ interface Loan {
 
 interface LoanTransaction {
   id: string;
+  loan_id: string;
   amount: number;
   payment_date: string;
   transaction_type: string;
@@ -75,9 +76,14 @@ const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onBack }) =
   useEffect(() => {
     if (user) {
       fetchLoans();
-      fetchTransactions();
     }
   }, [user, customer.id]);
+
+  useEffect(() => {
+    if (user && loans.length > 0) {
+      fetchTransactions();
+    }
+  }, [user, loans]);
 
   const fetchLoans = async () => {
     try {
@@ -96,6 +102,8 @@ const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onBack }) =
   };
 
   const fetchTransactions = async () => {
+    if (loans.length === 0) return;
+    
     try {
       const { data, error } = await supabase
         .from('loan_transactions')
@@ -157,7 +165,7 @@ const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onBack }) =
   };
 
   const calculateLoanBalance = (loan: Loan) => {
-    const loanTransactions = transactions.filter(t => t.loan && loan.id === selectedLoanId);
+    const loanTransactions = transactions.filter(t => t.loan_id === loan.id);
     const totalPaid = loanTransactions.reduce((sum, t) => sum + t.amount, 0);
     return loan.principal_amount - totalPaid;
   };
@@ -197,26 +205,34 @@ const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onBack }) =
             </Button>
           </CardHeader>
           <CardContent className="space-y-4">
-            {loans.filter(l => l.is_active).map((loan) => (
-              <div key={loan.id} className="p-4 border rounded-lg">
-                <div className="flex justify-between items-start mb-2">
-                  <div>
-                    <p className="font-medium">{loan.description || 'Loan'}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {new Date(loan.loan_date).toLocaleDateString()}
-                    </p>
+            {loans.filter(l => l.is_active).map((loan) => {
+              const balance = calculateLoanBalance(loan);
+              return (
+                <div key={loan.id} className="p-4 border rounded-lg">
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <p className="font-medium">{loan.description || 'Loan'}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {new Date(loan.loan_date).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <Badge variant="secondary">
+                        {formatCurrency(loan.principal_amount)}
+                      </Badge>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        Balance: {formatCurrency(balance)}
+                      </p>
+                    </div>
                   </div>
-                  <Badge variant="secondary">
-                    {formatCurrency(loan.principal_amount)}
-                  </Badge>
+                  {loan.interest_type !== 'none' && (
+                    <p className="text-sm text-muted-foreground">
+                      {loan.interest_rate}% {loan.interest_type} interest
+                    </p>
+                  )}
                 </div>
-                {loan.interest_type !== 'none' && (
-                  <p className="text-sm text-muted-foreground">
-                    {loan.interest_rate}% {loan.interest_type} interest
-                  </p>
-                )}
-              </div>
-            ))}
+              );
+            })}
             {loans.filter(l => l.is_active).length === 0 && (
               <p className="text-muted-foreground text-center py-4">No active loans</p>
             )}
