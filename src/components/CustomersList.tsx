@@ -4,14 +4,15 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Phone, Trash2, MapPin } from 'lucide-react';
+import { Phone, Trash2, MapPin, Eye } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import CustomerDetails from './CustomerDetails';
 
 interface Customer {
   id: string;
   name: string;
-  phone?: string;
-  address?: string;
+  phone: string | null;
+  address: string | null;
   loans?: Array<{
     id: string;
     principal_amount: number;
@@ -24,6 +25,7 @@ const CustomersList = () => {
   const { toast } = useToast();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -93,6 +95,15 @@ const CustomersList = () => {
     }
   };
 
+  if (selectedCustomer) {
+    return (
+      <CustomerDetails 
+        customer={selectedCustomer} 
+        onBack={() => setSelectedCustomer(null)} 
+      />
+    );
+  }
+
   if (loading) {
     return <div>Loading customers...</div>;
   }
@@ -124,6 +135,13 @@ const CustomersList = () => {
                       {activeLoans.length} Active Loan{activeLoans.length > 1 ? 's' : ''}
                     </Badge>
                   )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setSelectedCustomer(customer)}
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
                   <Button
                     variant="ghost"
                     size="sm"

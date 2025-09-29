@@ -30,6 +30,7 @@ interface Loan {
   interest_type: 'daily' | 'monthly' | 'none';
   loan_date: string;
   due_date?: string;
+  description?: string;
   is_active: boolean;
   customers: {
     name: string;
@@ -82,6 +83,7 @@ const LoansList: React.FC<LoansListProps> = ({ onUpdate }) => {
           interest_type,
           loan_date,
           due_date,
+          description,
           is_active,
           customers (name, phone)
         `)
@@ -209,7 +211,12 @@ const LoansList: React.FC<LoansListProps> = ({ onUpdate }) => {
           <Card key={loan.id} className={`${!loan.is_active ? 'opacity-60' : ''}`}>
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-lg">{loan.customers.name}</CardTitle>
+                <div>
+                  <CardTitle className="text-lg">{loan.customers.name}</CardTitle>
+                  {loan.description && (
+                    <p className="text-sm text-muted-foreground mt-1">{loan.description}</p>
+                  )}
+                </div>
                 <div className="flex items-center space-x-2">
                   <Badge variant={loan.is_active ? 'default' : 'secondary'}>
                     {loan.is_active ? 'Active' : 'Completed'}

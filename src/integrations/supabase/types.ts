@@ -151,6 +151,7 @@ export type Database = {
         Row: {
           created_at: string
           customer_id: string
+          description: string | null
           due_date: string | null
           id: string
           interest_rate: number | null
@@ -164,6 +165,7 @@ export type Database = {
         Insert: {
           created_at?: string
           customer_id: string
+          description?: string | null
           due_date?: string | null
           id?: string
           interest_rate?: number | null
@@ -177,6 +179,7 @@ export type Database = {
         Update: {
           created_at?: string
           customer_id?: string
+          description?: string | null
           due_date?: string | null
           id?: string
           interest_rate?: number | null

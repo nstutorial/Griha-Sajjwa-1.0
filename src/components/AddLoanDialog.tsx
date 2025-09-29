@@ -40,6 +40,7 @@ const AddLoanDialog: React.FC<AddLoanDialogProps> = ({ onLoanAdded }) => {
   const [formData, setFormData] = useState({
     customerId: '',
     principalAmount: '',
+    description: '',
     interestRate: '',
     interestType: 'none' as 'daily' | 'monthly' | 'none',
     loanDate: new Date().toISOString().split('T')[0],
@@ -79,6 +80,7 @@ const AddLoanDialog: React.FC<AddLoanDialogProps> = ({ onLoanAdded }) => {
           user_id: user.id,
           customer_id: formData.customerId,
           principal_amount: parseFloat(formData.principalAmount),
+          description: formData.description,
           interest_rate: formData.interestType === 'none' ? 0 : parseFloat(formData.interestRate),
           interest_type: formData.interestType,
           loan_date: formData.loanDate,
@@ -95,6 +97,7 @@ const AddLoanDialog: React.FC<AddLoanDialogProps> = ({ onLoanAdded }) => {
       setFormData({
         customerId: '',
         principalAmount: '',
+        description: '',
         interestRate: '',
         interestType: 'none',
         loanDate: new Date().toISOString().split('T')[0],
@@ -154,6 +157,17 @@ const AddLoanDialog: React.FC<AddLoanDialogProps> = ({ onLoanAdded }) => {
               value={formData.principalAmount}
               onChange={(e) => setFormData({ ...formData, principalAmount: e.target.value })}
               required
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="description">Loan Description</Label>
+            <Input
+              id="description"
+              type="text"
+              placeholder="Enter loan description"
+              value={formData.description}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
             />
           </div>
 
