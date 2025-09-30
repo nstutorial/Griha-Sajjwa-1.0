@@ -164,10 +164,39 @@ const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onBack }) =
     }
   };
 
+  const calculateInterest = (loan: Loan) => {
+    if (!loan.interest_rate || loan.interest_type === 'none') return 0;
+    
+    const principal = loan.principal_amount;
+    const rate = loan.interest_rate / 100;
+    
+    if (loan.interest_type === 'simple') {
+      const startDate = new Date(loan.loan_date);
+      const endDate = new Date();
+      const months = (endDate.getFullYear() - startDate.getFullYear()) * 12 + 
+                     (endDate.getMonth() - startDate.getMonth());
+      return principal * rate * (months / 12);
+    } else if (loan.interest_type === 'compound') {
+      const startDate = new Date(loan.loan_date);
+      const endDate = new Date();
+      const months = (endDate.getFullYear() - startDate.getFullYear()) * 12 + 
+                     (endDate.getMonth() - startDate.getMonth());
+      return principal * (Math.pow(1 + rate / 12, months) - 1);
+    }
+    
+    return 0;
+  };
+
   const calculateLoanBalance = (loan: Loan) => {
     const loanTransactions = transactions.filter(t => t.loan_id === loan.id);
     const totalPaid = loanTransactions.reduce((sum, t) => sum + t.amount, 0);
     return loan.principal_amount - totalPaid;
+  };
+
+  const calculateOutstandingAmount = (loan: Loan) => {
+    const balance = calculateLoanBalance(loan);
+    const interest = calculateInterest(loan);
+    return balance + interest;
   };
 
   const formatCurrency = (amount: number) => {
@@ -284,11 +313,14 @@ const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onBack }) =
                   <SelectValue placeholder="Select a loan" />
                 </SelectTrigger>
                 <SelectContent>
-                  {loans.filter(l => l.is_active).map((loan) => (
-                    <SelectItem key={loan.id} value={loan.id}>
-                      {loan.description || 'Loan'} - {formatCurrency(loan.principal_amount)}
-                    </SelectItem>
-                  ))}
+                  {loans.filter(l => l.is_active && calculateLoanBalance(l) > 0).map((loan) => {
+                    const outstanding = calculateOutstandingAmount(loan);
+                    return (
+                      <SelectItem key={loan.id} value={loan.id}>
+                        {loan.description || 'Loan'} - {formatCurrency(loan.principal_amount)} (Outstanding: {formatCurrency(outstanding)})
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>
@@ -301,9 +333,30 @@ const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onBack }) =
                 step="0.01"
                 placeholder="Enter payment amount"
                 value={paymentData.amount}
-                onChange={(e) => setPaymentData({ ...paymentData, amount: e.target.value })}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  const selectedLoan = loans.find(l => l.id === selectedLoanId);
+                  if (selectedLoan) {
+                    const maxAmount = calculateOutstandingAmount(selectedLoan);
+                    if (parseFloat(value) > maxAmount) {
+                      toast({
+                        variant: "destructive",
+                        title: "Invalid amount",
+                        description: `Payment amount cannot exceed outstanding balance of ${formatCurrency(maxAmount)}`,
+                      });
+                      return;
+                    }
+                  }
+                  setPaymentData({ ...paymentData, amount: value });
+                }}
                 required
+                max={selectedLoanId ? calculateOutstandingAmount(loans.find(l => l.id === selectedLoanId)!) : undefined}
               />
+              {selectedLoanId && (
+                <p className="text-xs text-muted-foreground">
+                  Maximum amount: {formatCurrency(calculateOutstandingAmount(loans.find(l => l.id === selectedLoanId)!))}
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
