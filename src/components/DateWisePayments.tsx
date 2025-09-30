@@ -323,9 +323,7 @@ const DateWisePayments: React.FC<DateWisePaymentsProps> = ({ onUpdate }) => {
                             <p className="font-medium">{transaction.loan.customers.name}</p>
                             <div className="flex items-center gap-4 text-sm text-muted-foreground">
                               <span>{transaction.loan.loan_number}</span>
-                              {transaction.loan.customers.phone && (
-                                <span>{transaction.loan.customers.phone}</span>
-                              )}
+                              
                               <Badge variant="secondary" className="text-xs">
                                 {transaction.transaction_type}
                               </Badge>
@@ -335,6 +333,11 @@ const DateWisePayments: React.FC<DateWisePaymentsProps> = ({ onUpdate }) => {
                                 Note: {transaction.notes}
                               </p>
                             )}
+                            <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                              {transaction.loan.customers.phone && (
+                                <span>{transaction.loan.customers.phone}</span>
+                              )}
+                              </div>
                           </div>
                         </div>
                         <div className="text-right">
