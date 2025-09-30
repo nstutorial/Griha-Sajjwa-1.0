@@ -14,7 +14,8 @@ import {
   LogOut,
   CreditCard,
   Banknote,
-  Calendar
+  Calendar,
+  Receipt
 } from 'lucide-react';
 import ExpensesList from '@/components/ExpensesList';
 import AddExpenseDialog from '@/components/AddExpenseDialog';
@@ -23,6 +24,7 @@ import AddLoanDialog from '@/components/AddLoanDialog';
 import CustomersList from '@/components/CustomersList';
 import AddCustomerDialog from '@/components/AddCustomerDialog';
 import DaywisePayment from '@/components/DaywisePayment';
+import DateWisePayments from '@/components/DateWisePayments';
 
 interface DashboardStats {
   totalExpenses: number;
@@ -159,13 +161,17 @@ const Dashboard = () => {
 
         {/* Main Content */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="expenses">Expenses</TabsTrigger>
             <TabsTrigger value="loans">Loans</TabsTrigger>
             <TabsTrigger value="customers">Customers</TabsTrigger>
             <TabsTrigger value="daywise" className="flex items-center gap-2">
               <Calendar className="h-4 w-4" />
               Daywise
+            </TabsTrigger>
+            <TabsTrigger value="payments" className="flex items-center gap-2">
+              <Receipt className="h-4 w-4" />
+              Payments
             </TabsTrigger>
           </TabsList>
 
@@ -199,6 +205,13 @@ const Dashboard = () => {
               <AddCustomerDialog />
             </div>
             <DaywisePayment onUpdate={fetchStats} />
+          </TabsContent>
+
+          <TabsContent value="payments" className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-semibold">Date-wise Payment Records</h2>
+            </div>
+            <DateWisePayments onUpdate={fetchStats} />
           </TabsContent>
         </Tabs>
       </div>
