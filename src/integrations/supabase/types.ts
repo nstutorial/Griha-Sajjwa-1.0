@@ -158,6 +158,7 @@ export type Database = {
           interest_type: string | null
           is_active: boolean | null
           loan_date: string
+          loan_number: string | null
           principal_amount: number
           updated_at: string
           user_id: string
@@ -172,6 +173,7 @@ export type Database = {
           interest_type?: string | null
           is_active?: boolean | null
           loan_date?: string
+          loan_number?: string | null
           principal_amount: number
           updated_at?: string
           user_id: string
@@ -186,6 +188,7 @@ export type Database = {
           interest_type?: string | null
           is_active?: boolean | null
           loan_date?: string
+          loan_number?: string | null
           principal_amount?: number
           updated_at?: string
           user_id?: string
@@ -232,7 +235,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      generate_loan_number: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
     }
     Enums: {
       payment_method: "cash" | "bank"
