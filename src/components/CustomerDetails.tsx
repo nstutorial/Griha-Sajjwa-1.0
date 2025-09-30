@@ -29,6 +29,7 @@ interface Customer {
   name: string;
   phone: string | null;
   address: string | null;
+  payment_day: string | null;
 }
 
 interface Loan {
@@ -220,6 +221,11 @@ const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onBack }) =
           <h2 className="text-2xl font-bold">{customer.name}</h2>
           {customer.phone && <p className="text-muted-foreground">{customer.phone}</p>}
           {customer.address && <p className="text-muted-foreground">{customer.address}</p>}
+          {customer.payment_day && (
+            <p className="text-muted-foreground">
+              Payment Day: {customer.payment_day.charAt(0).toUpperCase() + customer.payment_day.slice(1)}
+            </p>
+          )}
         </div>
       </div>
 
