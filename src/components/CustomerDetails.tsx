@@ -164,10 +164,15 @@ const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onBack }) =
     }
   };
 
-  const calculateInterest = (loan: Loan) => {
+  const calculateLoanBalance = (loan: Loan) => {
+    const loanTransactions = transactions.filter(t => t.loan_id === loan.id);
+    const totalPaid = loanTransactions.reduce((sum, t) => sum + t.amount, 0);
+    return loan.principal_amount - totalPaid;
+  };
+
+  const calculateInterest = (loan: Loan, balance: number) => {
     if (!loan.interest_rate || loan.interest_type === 'none') return 0;
     
-    const principal = loan.principal_amount;
     const rate = loan.interest_rate / 100;
     
     if (loan.interest_type === 'simple') {
@@ -175,27 +180,21 @@ const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onBack }) =
       const endDate = new Date();
       const months = (endDate.getFullYear() - startDate.getFullYear()) * 12 + 
                      (endDate.getMonth() - startDate.getMonth());
-      return principal * rate * (months / 12);
+      return balance * rate * (months / 12);
     } else if (loan.interest_type === 'compound') {
       const startDate = new Date(loan.loan_date);
       const endDate = new Date();
       const months = (endDate.getFullYear() - startDate.getFullYear()) * 12 + 
                      (endDate.getMonth() - startDate.getMonth());
-      return principal * (Math.pow(1 + rate / 12, months) - 1);
+      return balance * (Math.pow(1 + rate / 12, months) - 1);
     }
     
     return 0;
   };
 
-  const calculateLoanBalance = (loan: Loan) => {
-    const loanTransactions = transactions.filter(t => t.loan_id === loan.id);
-    const totalPaid = loanTransactions.reduce((sum, t) => sum + t.amount, 0);
-    return loan.principal_amount - totalPaid;
-  };
-
   const calculateOutstandingAmount = (loan: Loan) => {
     const balance = calculateLoanBalance(loan);
-    const interest = calculateInterest(loan);
+    const interest = calculateInterest(loan, balance);
     return balance + interest;
   };
 
