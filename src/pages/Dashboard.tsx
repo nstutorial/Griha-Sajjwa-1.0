@@ -15,7 +15,8 @@ import {
   CreditCard,
   Banknote,
   Calendar,
-  Receipt
+  Receipt,
+  Shield
 } from 'lucide-react';
 import ExpensesList from '@/components/ExpensesList';
 import AddExpenseDialog from '@/components/AddExpenseDialog';
@@ -25,6 +26,7 @@ import CustomersList from '@/components/CustomersList';
 import AddCustomerDialog from '@/components/AddCustomerDialog';
 import DaywisePayment from '@/components/DaywisePayment';
 import DateWisePayments from '@/components/DateWisePayments';
+import SecurityTest from '@/components/SecurityTest';
 
 interface DashboardStats {
   totalExpenses: number;
@@ -161,7 +163,7 @@ const Dashboard = () => {
 
         {/* Main Content */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="expenses">Expenses</TabsTrigger>
             <TabsTrigger value="loans">Loans</TabsTrigger>
             <TabsTrigger value="customers">Customers</TabsTrigger>
@@ -172,6 +174,10 @@ const Dashboard = () => {
             <TabsTrigger value="payments" className="flex items-center gap-2">
               <Receipt className="h-4 w-4" />
               Payments
+            </TabsTrigger>
+            <TabsTrigger value="security" className="flex items-center gap-2">
+              <Shield className="h-4 w-4" />
+              Security
             </TabsTrigger>
           </TabsList>
 
@@ -212,6 +218,13 @@ const Dashboard = () => {
               <h2 className="text-xl font-semibold">Date-wise Payment Records</h2>
             </div>
             <DateWisePayments onUpdate={fetchStats} />
+          </TabsContent>
+
+          <TabsContent value="security" className="space-y-4">
+            <div className="flex justify-between items-center">
+              <h2 className="text-xl font-semibold">Data Security Tests</h2>
+            </div>
+            <SecurityTest />
           </TabsContent>
         </Tabs>
       </div>
