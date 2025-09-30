@@ -135,7 +135,7 @@ const CustomerStatement: React.FC<CustomerStatementProps> = ({ customer }) => {
       if (isInRange) {
         allEntries.push({
           date: loan.loan_date,
-          description: `Loan Disbursement - ${loan.description || 'Loan'} (${loan.loan_number})`,
+          description: `Loan - ${loan.description || 'Loan'} (${loan.loan_number})`,
           reference: loan.loan_number,
           debit: loan.principal_amount,
           credit: 0,
