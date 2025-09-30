@@ -137,13 +137,19 @@ const CustomersList = () => {
     const rate = loan.interest_rate / 100;
     const startDate = new Date(loan.loan_date);
     const endDate = new Date();
-    const months = (endDate.getFullYear() - startDate.getFullYear()) * 12 + 
-                   (endDate.getMonth() - startDate.getMonth());
     
-    if (loan.interest_type === 'simple') {
-      return balance * rate * (months / 12);
-    } else if (loan.interest_type === 'compound') {
-      return balance * (Math.pow(1 + rate / 12, months) - 1);
+    if (loan.interest_type === 'daily') {
+      // Daily interest calculation
+      const timeDiff = endDate.getTime() - startDate.getTime();
+      const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+      return balance * rate * (daysDiff / 365);
+    } else if (loan.interest_type === 'monthly') {
+      // Monthly interest calculation
+      const months = (endDate.getFullYear() - startDate.getFullYear()) * 12 + 
+                     (endDate.getMonth() - startDate.getMonth());
+      const daysInMonth = (endDate.getDate() - startDate.getDate()) / 30; // Approximate partial month
+      const totalMonths = months + daysInMonth;
+      return balance * rate * totalMonths;
     }
     
     return 0;
