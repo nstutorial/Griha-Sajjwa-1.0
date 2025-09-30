@@ -175,7 +175,7 @@ const Dashboard = () => {
               <Receipt className="h-4 w-4" />
               Payments
             </TabsTrigger>
-            <TabsTrigger value="security" className="flex items-center gap-2">
+            <TabsTrigger value="security" className="flex items-center gap-2 hidden">
               <Shield className="h-4 w-4" />
               Security
             </TabsTrigger>
