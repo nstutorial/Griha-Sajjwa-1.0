@@ -42,7 +42,7 @@ const AddLoanDialog: React.FC<AddLoanDialogProps> = ({ onLoanAdded }) => {
     principalAmount: '',
     description: '',
     interestRate: '',
-    interestType: 'none' as 'daily' | 'monthly' | 'none',
+    interestType: 'none' as 'simple' | 'compound' | 'none',
     loanDate: new Date().toISOString().split('T')[0],
     dueDate: '',
   });
@@ -175,22 +175,24 @@ const AddLoanDialog: React.FC<AddLoanDialogProps> = ({ onLoanAdded }) => {
             <Label>Interest Type</Label>
             <Select 
               value={formData.interestType} 
-              onValueChange={(value: 'daily' | 'monthly' | 'none') => setFormData({ ...formData, interestType: value })}
+              onValueChange={(value: 'simple' | 'compound' | 'none') => setFormData({ ...formData, interestType: value })}
             >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">No Interest</SelectItem>
-                <SelectItem value="daily">Daily Interest</SelectItem>
-                <SelectItem value="monthly">Monthly Interest</SelectItem>
+                <SelectItem value="simple">Simple Interest (Annual)</SelectItem>
+                <SelectItem value="compound">Compound Interest (Monthly)</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           {formData.interestType !== 'none' && (
             <div className="space-y-2">
-              <Label htmlFor="interest-rate">Interest Rate (%)</Label>
+              <Label htmlFor="interest-rate">
+                Interest Rate (% {formData.interestType === 'simple' ? 'per annum' : 'per month'})
+              </Label>
               <Input
                 id="interest-rate"
                 type="number"

@@ -25,9 +25,10 @@ import { useToast } from '@/hooks/use-toast';
 
 interface Loan {
   id: string;
+  loan_number: string;
   principal_amount: number;
   interest_rate: number;
-  interest_type: 'daily' | 'monthly' | 'none';
+  interest_type: 'daily' | 'monthly' | 'none' | 'simple' | 'compound';
   loan_date: string;
   due_date?: string;
   description?: string;
@@ -40,6 +41,7 @@ interface Loan {
 
 interface LoanTransaction {
   id: string;
+  loan_id: string;
   amount: number;
   transaction_type: 'principal' | 'interest' | 'mixed';
   payment_date: string;
@@ -59,6 +61,7 @@ const LoansList: React.FC<LoansListProps> = ({ onUpdate }) => {
   const [transactions, setTransactions] = useState<LoanTransaction[]>([]);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [showLedgerDialog, setShowLedgerDialog] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   const [paymentData, setPaymentData] = useState({
     amount: '',
@@ -78,6 +81,7 @@ const LoansList: React.FC<LoansListProps> = ({ onUpdate }) => {
         .from('loans')
         .select(`
           id,
+          loan_number,
           principal_amount,
           interest_rate,
           interest_type,
@@ -124,21 +128,37 @@ const LoansList: React.FC<LoansListProps> = ({ onUpdate }) => {
     }
   };
 
-  const calculateInterest = (loan: Loan): number => {
+  const calculateLoanBalance = (loanId: string) => {
+    const loanTransactions = transactions.filter(t => t.loan_id === loanId);
+    const totalPaid = loanTransactions.reduce((sum, t) => sum + t.amount, 0);
+    const loan = loans.find(l => l.id === loanId);
+    return loan ? loan.principal_amount - totalPaid : 0;
+  };
+
+  const calculateInterest = (loan: Loan, balance: number): number => {
     if (loan.interest_type === 'none' || loan.interest_rate === 0) return 0;
 
     const loanDate = new Date(loan.loan_date);
     const currentDate = new Date();
-    const daysDiff = Math.floor((currentDate.getTime() - loanDate.getTime()) / (1000 * 60 * 60 * 24));
+    const rate = loan.interest_rate / 100;
 
-    if (loan.interest_type === 'daily') {
-      return (loan.principal_amount * loan.interest_rate * daysDiff) / 100;
-    } else if (loan.interest_type === 'monthly') {
-      const monthsDiff = daysDiff / 30;
-      return (loan.principal_amount * loan.interest_rate * monthsDiff) / 100;
+    if (loan.interest_type === 'simple') {
+      const months = (currentDate.getFullYear() - loanDate.getFullYear()) * 12 + 
+                     (currentDate.getMonth() - loanDate.getMonth());
+      return balance * rate * (months / 12);
+    } else if (loan.interest_type === 'compound') {
+      const months = (currentDate.getFullYear() - loanDate.getFullYear()) * 12 + 
+                     (currentDate.getMonth() - loanDate.getMonth());
+      return balance * (Math.pow(1 + rate / 12, months) - 1);
     }
 
     return 0;
+  };
+
+  const calculateOutstandingAmount = (loan: Loan) => {
+    const balance = calculateLoanBalance(loan.id);
+    const interest = calculateInterest(loan, balance);
+    return balance + interest;
   };
 
   const handlePayment = async (e: React.FormEvent) => {
@@ -164,7 +184,8 @@ const LoansList: React.FC<LoansListProps> = ({ onUpdate }) => {
 
       setPaymentData({ amount: '', type: 'mixed', notes: '' });
       setShowPaymentDialog(false);
-      fetchLoans();
+      await fetchLoans();
+      await fetchTransactions(selectedLoan.id);
       onUpdate();
     } catch (error) {
       console.error('Error recording payment:', error);
@@ -187,39 +208,80 @@ const LoansList: React.FC<LoansListProps> = ({ onUpdate }) => {
     setShowPaymentDialog(true);
   };
 
+  useEffect(() => {
+    if (user && loans.length > 0) {
+      const loanIds = loans.map(l => l.id);
+      const fetchAllTransactions = async () => {
+        const { data } = await supabase
+          .from('loan_transactions')
+          .select('*')
+          .in('loan_id', loanIds);
+        setTransactions((data as LoanTransaction[]) || []);
+      };
+      fetchAllTransactions();
+    }
+  }, [user, loans]);
+
+  const filteredLoans = loans.filter(loan => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      loan.customers.name.toLowerCase().includes(query) ||
+      loan.loan_number?.toLowerCase().includes(query) ||
+      loan.description?.toLowerCase().includes(query)
+    );
+  });
+
   if (loading) {
     return <div>Loading loans...</div>;
   }
 
-  if (loans.length === 0) {
-    return (
-      <Card>
-        <CardContent className="py-8 text-center">
-          <p className="text-muted-foreground">No loans recorded yet. Create your first loan!</p>
-        </CardContent>
-      </Card>
-    );
-  }
-
   return (
     <div className="space-y-4">
-      {loans.map((loan) => {
-        const interest = calculateInterest(loan);
+      <div className="flex gap-2">
+        <Input
+          placeholder="Search by customer, loan ID, or description..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="max-w-md"
+        />
+      </div>
+
+      {filteredLoans.length === 0 && (
+        <Card>
+          <CardContent className="py-8 text-center">
+            <p className="text-muted-foreground">
+              {searchQuery ? 'No loans found matching your search.' : 'No loans recorded yet. Create your first loan!'}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {filteredLoans.map((loan) => {
+        const balance = calculateLoanBalance(loan.id);
+        const interest = calculateInterest(loan, balance);
+        const outstanding = balance + interest;
         const totalAmount = loan.principal_amount + interest;
+        const isClosed = outstanding <= 0;
         
         return (
-          <Card key={loan.id} className={`${!loan.is_active ? 'opacity-60' : ''}`}>
+          <Card key={loan.id} className={`${isClosed ? 'opacity-60' : ''}`}>
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle className="text-lg">{loan.customers.name}</CardTitle>
+                  <div className="flex items-center gap-2">
+                    <CardTitle className="text-lg">{loan.customers.name}</CardTitle>
+                    <Badge variant="outline" className="text-xs">
+                      #{loan.loan_number}
+                    </Badge>
+                  </div>
                   {loan.description && (
                     <p className="text-sm text-muted-foreground mt-1">{loan.description}</p>
                   )}
                 </div>
                 <div className="flex items-center space-x-2">
-                  <Badge variant={loan.is_active ? 'default' : 'secondary'}>
-                    {loan.is_active ? 'Active' : 'Completed'}
+                  <Badge variant={isClosed ? 'secondary' : 'default'}>
+                    {isClosed ? 'Closed' : 'Active'}
                   </Badge>
                   <Badge variant="outline">
                     {loan.interest_type === 'none' ? 'No Interest' : 
@@ -229,7 +291,7 @@ const LoansList: React.FC<LoansListProps> = ({ onUpdate }) => {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Principal</p>
                   <p className="font-semibold">₹{loan.principal_amount.toFixed(2)}</p>
@@ -243,12 +305,18 @@ const LoansList: React.FC<LoansListProps> = ({ onUpdate }) => {
                   <p className="font-semibold text-primary">₹{totalAmount.toFixed(2)}</p>
                 </div>
                 <div>
+                  <p className="text-sm text-muted-foreground">Outstanding Balance</p>
+                  <p className={`font-semibold ${isClosed ? 'text-green-600' : 'text-red-600'}`}>
+                    ₹{outstanding.toFixed(2)}
+                  </p>
+                </div>
+                <div>
                   <p className="text-sm text-muted-foreground">Loan Date</p>
                   <p className="font-semibold">{new Date(loan.loan_date).toLocaleDateString()}</p>
                 </div>
               </div>
               
-              {loan.is_active && (
+              {!isClosed && (
                 <div className="flex space-x-2">
                   <Button size="sm" onClick={() => showPayment(loan)}>
                     <Plus className="h-4 w-4 mr-1" />
@@ -335,7 +403,9 @@ const LoansList: React.FC<LoansListProps> = ({ onUpdate }) => {
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Current Interest</p>
-                    <p className="font-semibold text-orange-600">₹{calculateInterest(selectedLoan).toFixed(2)}</p>
+                    <p className="font-semibold text-orange-600">
+                      ₹{calculateInterest(selectedLoan, calculateLoanBalance(selectedLoan.id)).toFixed(2)}
+                    </p>
                   </div>
                 </div>
               </div>

@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { Phone, Trash2, MapPin, Eye } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import CustomerDetails from './CustomerDetails';
@@ -26,6 +27,8 @@ const CustomersList = () => {
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [allTransactions, setAllTransactions] = useState<any[]>([]);
 
   useEffect(() => {
     if (user) {
@@ -39,13 +42,25 @@ const CustomersList = () => {
         .from('customers')
         .select(`
           *,
-          loans (id, principal_amount, is_active)
+          loans (id, principal_amount, is_active, interest_rate, interest_type, loan_date)
         `)
         .eq('user_id', user?.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
       setCustomers(data || []);
+
+      // Fetch all transactions for calculating outstanding balances
+      if (data && data.length > 0) {
+        const loanIds = data.flatMap(c => c.loans?.map(l => l.id) || []);
+        if (loanIds.length > 0) {
+          const { data: transData } = await supabase
+            .from('loan_transactions')
+            .select('*')
+            .in('loan_id', loanIds);
+          setAllTransactions(transData || []);
+        }
+      }
     } catch (error) {
       console.error('Error fetching customers:', error);
       toast({
@@ -110,6 +125,49 @@ const CustomersList = () => {
     }
   };
 
+  const calculateLoanBalance = (loan: any) => {
+    const loanTransactions = allTransactions.filter(t => t.loan_id === loan.id);
+    const totalPaid = loanTransactions.reduce((sum, t) => sum + t.amount, 0);
+    return loan.principal_amount - totalPaid;
+  };
+
+  const calculateInterest = (loan: any, balance: number) => {
+    if (!loan.interest_rate || loan.interest_type === 'none') return 0;
+    
+    const rate = loan.interest_rate / 100;
+    const startDate = new Date(loan.loan_date);
+    const endDate = new Date();
+    const months = (endDate.getFullYear() - startDate.getFullYear()) * 12 + 
+                   (endDate.getMonth() - startDate.getMonth());
+    
+    if (loan.interest_type === 'simple') {
+      return balance * rate * (months / 12);
+    } else if (loan.interest_type === 'compound') {
+      return balance * (Math.pow(1 + rate / 12, months) - 1);
+    }
+    
+    return 0;
+  };
+
+  const calculateCustomerOutstanding = (customer: Customer) => {
+    const activeLoans = customer.loans?.filter(loan => loan.is_active) || [];
+    return activeLoans.reduce((sum, loan) => {
+      const balance = calculateLoanBalance(loan);
+      const interest = calculateInterest(loan, balance);
+      return sum + balance + interest;
+    }, 0);
+  };
+
+  const filteredCustomers = customers.filter(customer => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      customer.name.toLowerCase().includes(query) ||
+      customer.phone?.toLowerCase().includes(query) ||
+      customer.address?.toLowerCase().includes(query)
+    );
+  });
+
   if (selectedCustomer) {
     return (
       <CustomerDetails 
@@ -123,27 +181,48 @@ const CustomersList = () => {
     return <div>Loading customers...</div>;
   }
 
-  if (customers.length === 0) {
-    return (
-      <Card>
-        <CardContent className="py-8 text-center">
-          <p className="text-muted-foreground">No customers added yet. Add your first customer!</p>
-        </CardContent>
-      </Card>
-    );
-  }
-
   return (
     <div className="space-y-4">
-      {customers.map((customer) => {
+      <div className="flex gap-2">
+        <Input
+          placeholder="Search by name, phone, or address..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="max-w-md"
+        />
+      </div>
+
+      {filteredCustomers.length === 0 && (
+        <Card>
+          <CardContent className="py-8 text-center">
+            <p className="text-muted-foreground">
+              {searchQuery ? 'No customers found matching your search.' : 'No customers added yet. Add your first customer!'}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {filteredCustomers.map((customer) => {
         const activeLoans = customer.loans?.filter(loan => loan.is_active) || [];
         const totalLoaned = customer.loans?.reduce((sum, loan) => sum + Number(loan.principal_amount), 0) || 0;
+        const outstandingBalance = calculateCustomerOutstanding(customer);
+        const customerId = customer.phone || 'N/A';
         
         return (
           <Card key={customer.id}>
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-lg">{customer.name}</CardTitle>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <CardTitle className="text-lg">{customer.name}</CardTitle>
+                    {customer.phone && (
+                      <Badge variant="outline" className="text-xs">
+                        {customer.phone}
+                      </Badge>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">Customer ID: {customerId}</p>
+                </div>
                 <div className="flex items-center space-x-2">
                   {activeLoans.length > 0 && (
                     <Badge variant="default">
@@ -169,25 +248,16 @@ const CustomersList = () => {
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="space-y-2">
-                {customer.phone && (
-                  <div className="flex items-center space-x-2">
-                    <Phone className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm">{customer.phone}</span>
-                  </div>
-                )}
-                
-                {customer.address && (
-                  <div className="flex items-center space-x-2">
-                    <MapPin className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm">{customer.address}</span>
-                  </div>
-                )}
-              </div>
+              {customer.address && (
+                <div className="flex items-center space-x-2">
+                  <MapPin className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm">{customer.address}</span>
+                </div>
+              )}
 
               {totalLoaned > 0 && (
                 <div className="p-3 bg-muted rounded-lg">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-3 gap-4">
                     <div>
                       <p className="text-sm text-muted-foreground">Total Loaned</p>
                       <p className="font-semibold">₹{totalLoaned.toFixed(2)}</p>
@@ -195,6 +265,10 @@ const CustomersList = () => {
                     <div>
                       <p className="text-sm text-muted-foreground">Active Loans</p>
                       <p className="font-semibold">{activeLoans.length}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Outstanding Balance</p>
+                      <p className="font-semibold text-red-600">₹{outstandingBalance.toFixed(2)}</p>
                     </div>
                   </div>
                 </div>
