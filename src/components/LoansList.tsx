@@ -28,7 +28,7 @@ interface Loan {
   loan_number: string;
   principal_amount: number;
   interest_rate: number;
-  interest_type: 'daily' | 'monthly' | 'none' | 'simple' | 'compound';
+  interest_type: 'daily' | 'monthly' | 'none';
   loan_date: string;
   due_date?: string;
   description?: string;
@@ -142,14 +142,18 @@ const LoansList: React.FC<LoansListProps> = ({ onUpdate }) => {
     const currentDate = new Date();
     const rate = loan.interest_rate / 100;
 
-    if (loan.interest_type === 'simple') {
+    if (loan.interest_type === 'daily') {
+      // Daily interest calculation
+      const timeDiff = currentDate.getTime() - loanDate.getTime();
+      const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+      return balance * rate * (daysDiff / 365);
+    } else if (loan.interest_type === 'monthly') {
+      // Monthly interest calculation
       const months = (currentDate.getFullYear() - loanDate.getFullYear()) * 12 + 
                      (currentDate.getMonth() - loanDate.getMonth());
-      return balance * rate * (months / 12);
-    } else if (loan.interest_type === 'compound') {
-      const months = (currentDate.getFullYear() - loanDate.getFullYear()) * 12 + 
-                     (currentDate.getMonth() - loanDate.getMonth());
-      return balance * (Math.pow(1 + rate / 12, months) - 1);
+      const daysInMonth = (currentDate.getDate() - loanDate.getDate()) / 30; // Approximate partial month
+      const totalMonths = months + daysInMonth;
+      return balance * rate * totalMonths;
     }
 
     return 0;
