@@ -15,6 +15,7 @@ interface Customer {
   name: string;
   phone: string | null;
   address: string | null;
+  payment_day: string | null;
 }
 
 interface Loan {
