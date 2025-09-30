@@ -12,6 +12,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Plus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -25,6 +32,7 @@ const AddCustomerDialog = () => {
     name: '',
     phone: '',
     address: '',
+    payment_day: '',
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -40,6 +48,7 @@ const AddCustomerDialog = () => {
           name: formData.name,
           phone: formData.phone || null,
           address: formData.address || null,
+          payment_day: formData.payment_day || null,
         });
 
       if (error) throw error;
@@ -53,6 +62,7 @@ const AddCustomerDialog = () => {
         name: '',
         phone: '',
         address: '',
+        payment_day: '',
       });
       
       setOpen(false);
@@ -114,6 +124,27 @@ const AddCustomerDialog = () => {
               value={formData.address}
               onChange={(e) => setFormData({ ...formData, address: e.target.value })}
             />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Preferred Payment Day (Optional)</Label>
+            <Select 
+              value={formData.payment_day} 
+              onValueChange={(value: string) => setFormData({ ...formData, payment_day: value })}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select payment day" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="sunday">Sunday</SelectItem>
+                <SelectItem value="monday">Monday</SelectItem>
+                <SelectItem value="tuesday">Tuesday</SelectItem>
+                <SelectItem value="wednesday">Wednesday</SelectItem>
+                <SelectItem value="thursday">Thursday</SelectItem>
+                <SelectItem value="friday">Friday</SelectItem>
+                <SelectItem value="saturday">Saturday</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <Button type="submit" className="w-full" disabled={loading}>
