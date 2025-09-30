@@ -19,8 +19,10 @@ import {
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Plus, IndianRupee } from 'lucide-react';
+import { ArrowLeft, Plus, IndianRupee, FileText } from 'lucide-react';
+import CustomerStatement from './CustomerStatement';
 
 interface Customer {
   id: string;
@@ -174,19 +176,21 @@ const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onBack }) =
     if (!loan.interest_rate || loan.interest_type === 'none') return 0;
     
     const rate = loan.interest_rate / 100;
+    const startDate = new Date(loan.loan_date);
+    const endDate = new Date();
     
-    if (loan.interest_type === 'simple') {
-      const startDate = new Date(loan.loan_date);
-      const endDate = new Date();
+    if (loan.interest_type === 'daily') {
+      // Daily interest calculation
+      const timeDiff = endDate.getTime() - startDate.getTime();
+      const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+      return balance * rate * (daysDiff / 365);
+    } else if (loan.interest_type === 'monthly') {
+      // Monthly interest calculation
       const months = (endDate.getFullYear() - startDate.getFullYear()) * 12 + 
                      (endDate.getMonth() - startDate.getMonth());
-      return balance * rate * (months / 12);
-    } else if (loan.interest_type === 'compound') {
-      const startDate = new Date(loan.loan_date);
-      const endDate = new Date();
-      const months = (endDate.getFullYear() - startDate.getFullYear()) * 12 + 
-                     (endDate.getMonth() - startDate.getMonth());
-      return balance * (Math.pow(1 + rate / 12, months) - 1);
+      const daysInMonth = (endDate.getDate() - startDate.getDate()) / 30; // Approximate partial month
+      const totalMonths = months + daysInMonth;
+      return balance * rate * totalMonths;
     }
     
     return 0;
@@ -219,7 +223,20 @@ const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onBack }) =
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-2">
+      <Tabs defaultValue="overview" className="w-full">
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="overview" className="flex items-center gap-2">
+            <IndianRupee className="h-4 w-4" />
+            Overview
+          </TabsTrigger>
+          <TabsTrigger value="statement" className="flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            Statement
+          </TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="overview" className="space-y-6">
+          <div className="grid gap-6 md:grid-cols-2">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Active Loans</CardTitle>
@@ -297,7 +314,13 @@ const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onBack }) =
             </div>
           </CardContent>
         </Card>
-      </div>
+          </div>
+        </TabsContent>
+        
+        <TabsContent value="statement" className="space-y-6">
+          <CustomerStatement customer={customer} />
+        </TabsContent>
+      </Tabs>
 
       <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
         <DialogContent className="sm:max-w-[425px]">
