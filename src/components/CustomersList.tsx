@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Phone, Trash2, MapPin, Eye } from 'lucide-react';
+import { Phone, Trash2, MapPin, Eye, Calendar } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import CustomerDetails from './CustomerDetails';
 
@@ -14,6 +14,7 @@ interface Customer {
   name: string;
   phone: string | null;
   address: string | null;
+  payment_day: string | null;
   loans?: Array<{
     id: string;
     principal_amount: number;
@@ -258,6 +259,15 @@ const CustomersList = () => {
                 <div className="flex items-center space-x-2">
                   <MapPin className="h-4 w-4 text-muted-foreground" />
                   <span className="text-sm">{customer.address}</span>
+                </div>
+              )}
+
+              {customer.payment_day && (
+                <div className="flex items-center space-x-2">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm">
+                    Payment Day: {customer.payment_day.charAt(0).toUpperCase() + customer.payment_day.slice(1)}
+                  </span>
                 </div>
               )}
 
