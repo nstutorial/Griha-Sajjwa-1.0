@@ -110,17 +110,21 @@ const ExpensesList = () => {
                     )}
                   </div>
                   <div>
+                  <span className="text-sm text-muted-foreground">
+                        {new Date(expense.date).toLocaleDateString()}
+                      </span>
                     <p className="font-medium">{expense.description}</p>
                     <div className="flex items-center space-x-2 mt-1">
                       <Badge variant={expense.payment_method === 'bank' ? 'default' : 'secondary'}>
                         {expense.payment_method === 'bank' ? 'Bank' : 'Cash'}
                       </Badge>
-                      {expense.expense_categories && (
+                     
+                    </div>
+                    <div className="flex items-center space-x-2">
+                    {expense.expense_categories && (
                         <Badge variant="outline">{expense.expense_categories.name}</Badge>
                       )}
-                      <span className="text-sm text-muted-foreground">
-                        {new Date(expense.date).toLocaleDateString()}
-                      </span>
+                     
                     </div>
                   </div>
                 </div>
