@@ -122,6 +122,9 @@ const CustomerStatement: React.FC<CustomerStatementProps> = ({ customer }) => {
     const statementEntries: StatementEntry[] = [];
     let runningBalance = 0;
 
+    // Collect all entries first
+    const allEntries: StatementEntry[] = [];
+
     // Add loan disbursements
     loans.forEach(loan => {
       const loanDate = new Date(loan.loan_date);
@@ -129,16 +132,15 @@ const CustomerStatement: React.FC<CustomerStatementProps> = ({ customer }) => {
                        (!endDate || loanDate <= new Date(endDate));
 
       if (isInRange) {
-        statementEntries.push({
+        allEntries.push({
           date: loan.loan_date,
           description: `Loan Disbursement - ${loan.description || 'Loan'} (${loan.loan_number})`,
           reference: loan.loan_number,
           debit: loan.principal_amount,
           credit: 0,
-          balance: runningBalance + loan.principal_amount,
+          balance: 0, // Will be calculated after sorting
           type: 'loan_disbursement'
         });
-        runningBalance += loan.principal_amount;
       }
     });
 
@@ -149,21 +151,32 @@ const CustomerStatement: React.FC<CustomerStatementProps> = ({ customer }) => {
                        (!endDate || paymentDate <= new Date(endDate));
 
       if (isInRange) {
-        statementEntries.push({
+        allEntries.push({
           date: transaction.payment_date,
           description: `Payment Received - ${transaction.loan.description || 'Loan'} (${transaction.loan.loan_number})`,
           reference: transaction.id,
           debit: 0,
           credit: transaction.amount,
-          balance: runningBalance - transaction.amount,
+          balance: 0, // Will be calculated after sorting
           type: 'payment_received'
         });
-        runningBalance -= transaction.amount;
       }
     });
 
-    // Sort by date
-    statementEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    // Sort by date in ascending order
+    allEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    // Calculate running balance in chronological order
+    allEntries.forEach(entry => {
+      if (entry.type === 'loan_disbursement') {
+        entry.balance = runningBalance + entry.debit;
+        runningBalance += entry.debit;
+      } else if (entry.type === 'payment_received') {
+        entry.balance = runningBalance - entry.credit;
+        runningBalance -= entry.credit;
+      }
+      statementEntries.push(entry);
+    });
 
     setStatement(statementEntries);
   };
