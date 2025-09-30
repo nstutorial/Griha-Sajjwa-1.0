@@ -136,7 +136,7 @@ const CustomerStatement: React.FC<CustomerStatementProps> = ({ customer }) => {
         allEntries.push({
           date: loan.loan_date,
           // description: `Loan - ${loan.description || 'Loan'} (${loan.loan_number})`,
-           description: `Loan - ${loan.description`,
+           description: `Loan - ${loan.description}`,
           reference: loan.loan_number,
           debit: loan.principal_amount,
           credit: 0,
