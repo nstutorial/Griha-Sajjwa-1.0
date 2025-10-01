@@ -1,24 +1,21 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
+import { AppSidebar } from '@/components/AppSidebar';
 import { supabase } from '@/integrations/supabase/client';
 import { 
   Wallet, 
   TrendingUp, 
   Users, 
-  DollarSign, 
-  Plus,
+  DollarSign,
   LogOut,
-  CreditCard,
-  Banknote,
-  Calendar,
-  Receipt,
-  Shield
+  ShoppingCart
 } from 'lucide-react';
-import ExpensesList from '@/components/ExpensesList';
+import ExpensesListEnhanced from '@/components/ExpensesListEnhanced';
 import AddExpenseDialog from '@/components/AddExpenseDialog';
 import LoansList from '@/components/LoansList';
 import AddLoanDialog from '@/components/AddLoanDialog';
@@ -26,7 +23,11 @@ import CustomersList from '@/components/CustomersList';
 import AddCustomerDialog from '@/components/AddCustomerDialog';
 import DaywisePayment from '@/components/DaywisePayment';
 import DateWisePayments from '@/components/DateWisePayments';
-import SecurityTest from '@/components/SecurityTest';
+import SalesList from '@/components/SalesList';
+import AddSaleDialog from '@/components/AddSaleDialog';
+import SaleCustomersList from '@/components/SaleCustomersList';
+import SettingsDialog, { TabSettings } from '@/components/SettingsDialog';
+import { useToast } from '@/hooks/use-toast';
 
 interface DashboardStats {
   totalExpenses: number;
@@ -37,6 +38,8 @@ interface DashboardStats {
 
 const Dashboard = () => {
   const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
   const [stats, setStats] = useState<DashboardStats>({
     totalExpenses: 0,
     totalLoaned: 0,
@@ -44,10 +47,57 @@ const Dashboard = () => {
     activeLoans: 0,
   });
   const [activeTab, setActiveTab] = useState('expenses');
+  const [showSettings, setShowSettings] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
+  const [tabSettings, setTabSettings] = useState<TabSettings>({
+    expenses: true,
+    loans: true,
+    customers: true,
+    sales: true,
+    daywise: true,
+    payments: true,
+  });
   
   if (!user) {
     return <Navigate to="/auth" replace />;
   }
+
+  useEffect(() => {
+    if (user) {
+      fetchTabSettings();
+    }
+  }, [user]);
+
+  const fetchTabSettings = async () => {
+    if (!user) return;
+
+    const { data } = await supabase
+      .from('user_settings')
+      .select('visible_tabs')
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (data) {
+      setTabSettings(data.visible_tabs as unknown as TabSettings);
+    }
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      toast({
+        title: 'Signed out',
+        description: 'You have been signed out successfully',
+      });
+      navigate('/auth');
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to sign out',
+        variant: 'destructive',
+      });
+    }
+  };
 
   useEffect(() => {
     fetchStats();
@@ -94,22 +144,30 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="border-b bg-card">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <Wallet className="h-8 w-8 text-primary" />
-              <h1 className="text-2xl font-bold">Expense Tracker</h1>
+    <SidebarProvider>
+      <div className="min-h-screen flex w-full">
+        <AppSidebar
+          onSettingsClick={() => setShowSettings(true)}
+          onProfileClick={() => setShowProfile(true)}
+        />
+        
+        <div className="flex-1 flex flex-col">
+          {/* Header */}
+          <div className="border-b bg-card">
+            <div className="container mx-auto px-4 py-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <SidebarTrigger />
+                  <Wallet className="h-8 w-8 text-primary" />
+                  <h1 className="text-2xl font-bold">Expense Tracker</h1>
+                </div>
+                <Button variant="outline" onClick={handleSignOut}>
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Sign Out
+                </Button>
+              </div>
             </div>
-            <Button variant="outline" onClick={signOut}>
-              <LogOut className="h-4 w-4 mr-2" />
-              Sign Out
-            </Button>
           </div>
-        </div>
-      </div>
 
       <div className="container mx-auto px-4 py-6">
         {/* Stats Cards */}
@@ -161,74 +219,103 @@ const Dashboard = () => {
           </Card>
         </div>
 
-        {/* Main Content */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="expenses">Expenses</TabsTrigger>
-            <TabsTrigger value="loans">Loans</TabsTrigger>
-            <TabsTrigger value="customers">Customers</TabsTrigger>
-            <TabsTrigger value="daywise" className="flex items-center gap-2">
-              <Calendar className="h-4 w-4" />
-              Daywise
-            </TabsTrigger>
-            <TabsTrigger value="payments" className="flex items-center gap-2">
-              <Receipt className="h-4 w-4" />
-              Payments
-            </TabsTrigger>
-            <TabsTrigger value="security" className="flex items-center gap-2 hidden">
-              <Shield className="h-4 w-4" />
-              Security
-            </TabsTrigger>
-          </TabsList>
+          {/* Main Content */}
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full" style={{ gridTemplateColumns: `repeat(${Object.values(tabSettings).filter(Boolean).length}, 1fr)` }}>
+              {tabSettings.expenses && <TabsTrigger value="expenses">Expenses</TabsTrigger>}
+              {tabSettings.loans && <TabsTrigger value="loans">Loans</TabsTrigger>}
+              {tabSettings.customers && <TabsTrigger value="customers">Customers</TabsTrigger>}
+              {tabSettings.sales && (
+                <>
+                  <TabsTrigger value="sales">
+                    <ShoppingCart className="h-4 w-4 mr-2" />
+                    Sales
+                  </TabsTrigger>
+                  <TabsTrigger value="sale-customers">Sale Customers</TabsTrigger>
+                </>
+              )}
+              {tabSettings.daywise && <TabsTrigger value="daywise">Daywise</TabsTrigger>}
+              {tabSettings.payments && <TabsTrigger value="payments">Payments</TabsTrigger>}
+            </TabsList>
 
-          <TabsContent value="expenses" className="space-y-4">
-            <div className="flex justify-between items-center">
-              <h2 className="text-xl font-semibold">Your Expenses</h2>
-              <AddExpenseDialog onExpenseAdded={fetchStats} />
-            </div>
-            <ExpensesList />
-          </TabsContent>
+            {tabSettings.expenses && (
+              <TabsContent value="expenses" className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-xl font-semibold">Your Expenses</h2>
+                  <AddExpenseDialog onExpenseAdded={fetchStats} />
+                </div>
+                <ExpensesListEnhanced />
+              </TabsContent>
+            )}
 
-          <TabsContent value="loans" className="space-y-4">
-            <div className="flex justify-between items-center">
-              <h2 className="text-xl font-semibold">Loans & Lending</h2>
-              <AddLoanDialog onLoanAdded={fetchStats} />
-            </div>
-            <LoansList onUpdate={fetchStats} />
-          </TabsContent>
+            {tabSettings.loans && (
+              <TabsContent value="loans" className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-xl font-semibold">Loans & Lending</h2>
+                  <AddLoanDialog onLoanAdded={fetchStats} />
+                </div>
+                <LoansList onUpdate={fetchStats} />
+              </TabsContent>
+            )}
 
-          <TabsContent value="customers" className="space-y-4">
-            <div className="flex justify-between items-center">
-              <h2 className="text-xl font-semibold">Customers</h2>
-              <AddCustomerDialog />
-            </div>
-            <CustomersList />
-          </TabsContent>
+            {tabSettings.customers && (
+              <TabsContent value="customers" className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-xl font-semibold">Customers</h2>
+                  <AddCustomerDialog />
+                </div>
+                <CustomersList />
+              </TabsContent>
+            )}
 
-          <TabsContent value="daywise" className="space-y-4">
-            <div className="flex justify-between items-center">
-              <h2 className="text-xl font-semibold">Daywise Payment Schedule</h2>
-              <AddCustomerDialog />
-            </div>
-            <DaywisePayment onUpdate={fetchStats} />
-          </TabsContent>
+            {tabSettings.sales && (
+              <>
+                <TabsContent value="sales" className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h2 className="text-xl font-semibold">Sales</h2>
+                    <AddSaleDialog onSaleAdded={fetchStats} />
+                  </div>
+                  <SalesList onUpdate={fetchStats} />
+                </TabsContent>
 
-          <TabsContent value="payments" className="space-y-4">
-            <div className="flex justify-between items-center">
-              <h2 className="text-xl font-semibold">Date-wise Payment Records</h2>
-            </div>
-            <DateWisePayments onUpdate={fetchStats} />
-          </TabsContent>
+                <TabsContent value="sale-customers" className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h2 className="text-xl font-semibold">Sale Customers</h2>
+                  </div>
+                  <SaleCustomersList />
+                </TabsContent>
+              </>
+            )}
 
-          <TabsContent value="security" className="space-y-4">
-            <div className="flex justify-between items-center">
-              <h2 className="text-xl font-semibold">Data Security Tests</h2>
-            </div>
-            <SecurityTest />
-          </TabsContent>
-        </Tabs>
+            {tabSettings.daywise && (
+              <TabsContent value="daywise" className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-xl font-semibold">Daywise Payment Schedule</h2>
+                  <AddCustomerDialog />
+                </div>
+                <DaywisePayment onUpdate={fetchStats} />
+              </TabsContent>
+            )}
+
+            {tabSettings.payments && (
+              <TabsContent value="payments" className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-xl font-semibold">Date-wise Payment Records</h2>
+                </div>
+                <DateWisePayments onUpdate={fetchStats} />
+              </TabsContent>
+            )}
+          </Tabs>
+        </div>
       </div>
+
+      <SettingsDialog
+        open={showSettings}
+        onOpenChange={setShowSettings}
+        onSettingsUpdate={setTabSettings}
+      />
     </div>
+    </SidebarProvider>
   );
 };
 

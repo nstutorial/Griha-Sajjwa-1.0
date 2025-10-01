@@ -22,10 +22,10 @@ export const SecurityUtils = {
     SecurityUtils.ensureAuthenticated(user);
     
     return {
-      customers: () => supabase.from('customers').eq('user_id', user!.id),
-      loans: () => supabase.from('loans').eq('user_id', user!.id),
-      expenses: () => supabase.from('expenses').eq('user_id', user!.id),
-      expenseCategories: () => supabase.from('expense_categories').eq('user_id', user!.id),
+      customers: () => supabase.from('customers').select('*').eq('user_id', user!.id),
+      loans: () => supabase.from('loans').select('*').eq('user_id', user!.id),
+      expenses: () => supabase.from('expenses').select('*').eq('user_id', user!.id),
+      expenseCategories: () => supabase.from('expense_categories').select('*').eq('user_id', user!.id),
       loanTransactions: () => supabase
         .from('loan_transactions')
         .select(`
@@ -132,28 +132,28 @@ export const useSecureDatabase = (user: User | null) => {
 
   return {
     // Secure customer operations
-    getCustomers: () => SecurityUtils.createSecureQuery(user).customers().select('*'),
-    createCustomer: (data: any) => SecurityUtils.createSecureQuery(user).customers().insert({
+    getCustomers: () => SecurityUtils.createSecureQuery(user).customers(),
+    createCustomer: (data: any) => supabase.from('customers').insert({
       ...data,
       user_id: user.id,
     }),
     
     // Secure loan operations
-    getLoans: () => SecurityUtils.createSecureQuery(user).loans().select('*'),
-    createLoan: (data: any) => SecurityUtils.createSecureQuery(user).loans().insert({
+    getLoans: () => SecurityUtils.createSecureQuery(user).loans(),
+    createLoan: (data: any) => supabase.from('loans').insert({
       ...data,
       user_id: user.id,
     }),
     
     // Secure expense operations
-    getExpenses: () => SecurityUtils.createSecureQuery(user).expenses().select('*'),
-    createExpense: (data: any) => SecurityUtils.createSecureQuery(user).expenses().insert({
+    getExpenses: () => SecurityUtils.createSecureQuery(user).expenses(),
+    createExpense: (data: any) => supabase.from('expenses').insert({
       ...data,
       user_id: user.id,
     }),
     
     // Secure transaction operations
     getLoanTransactions: () => SecurityUtils.createSecureQuery(user).loanTransactions(),
-    createLoanTransaction: (data: any) => SecurityUtils.createSecureQuery(user).loanTransactions().insert(data),
+    createLoanTransaction: (data: any) => supabase.from('loan_transactions').insert(data),
   };
 };

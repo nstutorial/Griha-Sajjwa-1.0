@@ -93,12 +93,12 @@ const SecurityTest: React.FC = () => {
       });
 
       // Test 6: Check RLS is enabled on all tables
-      const tables = ['customers', 'loans', 'expenses', 'loan_transactions', 'expense_categories'];
+      const tables = ['customers', 'loans', 'expenses', 'loan_transactions', 'expense_categories'] as const;
       const rlsTests = await Promise.all(
         tables.map(async (table) => {
           try {
             // This query should be filtered by RLS
-            const { data } = await supabase.from(table).select('*').limit(1);
+            const { data } = await supabase.from(table as any).select('*').limit(1);
             return { table, enabled: true };
           } catch (error) {
             return { table, enabled: false };
