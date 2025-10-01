@@ -29,23 +29,57 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const { toast } = useToast();
 
   useEffect(() => {
+    let mounted = true;
+
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        setLoading(false);
+        if (mounted) {
+          setSession(session);
+          setUser(session?.user ?? null);
+          setLoading(false);
+        }
       }
     );
 
-    // Check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
+    // Check for existing session with timeout for mobile
+    const initializeAuth = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (mounted) {
+          if (error) {
+            console.error('Error getting session:', error);
+            setLoading(false);
+            return;
+          }
+          
+          setSession(session);
+          setUser(session?.user ?? null);
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error('Error initializing auth:', error);
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
 
-    return () => subscription.unsubscribe();
+    // Add timeout for mobile devices
+    const timeoutId = setTimeout(() => {
+      if (mounted) {
+        setLoading(false);
+      }
+    }, 5000); // 5 second timeout
+
+    initializeAuth();
+
+    return () => {
+      mounted = false;
+      clearTimeout(timeoutId);
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signUp = async (email: string, password: string, fullName: string) => {
@@ -100,6 +134,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           title: "Sign In Error",
           description: error.message,
         });
+      } else {
+        // On mobile, wait a bit for the session to be properly set
+        if (window.innerWidth < 768) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
       }
 
       return { error };
