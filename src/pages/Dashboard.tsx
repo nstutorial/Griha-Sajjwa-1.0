@@ -185,103 +185,110 @@ const Dashboard = () => {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full">
+      <div className="min-h-screen flex w-full overflow-x-hidden">
         <AppSidebar
           onSettingsClick={() => setShowSettings(true)}
           onProfileClick={() => setShowProfile(true)}
         />
         
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col min-w-0">
           {/* Header */}
           <div className="border-b bg-card">
-            <div className="container mx-auto px-4 py-4">
+            <div className="w-full px-4 py-4">
               <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-2 sm:space-x-3">
                   <SidebarTrigger />
-                  <Wallet className="h-8 w-8 text-primary" />
-                  <h1 className="text-2xl font-bold">Expense Tracker</h1>
+                  <Wallet className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
+                  <h1 className="text-lg sm:text-xl md:text-2xl font-bold truncate">MoneyTracker Pro</h1>
                 </div>
-                <Button variant="outline" onClick={handleSignOut}>
-                  <LogOut className="h-4 w-4 mr-2" />
-                  Sign Out
+                <Button variant="outline" onClick={handleSignOut} className="text-xs sm:text-sm">
+                  <LogOut className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                  <span className="hidden sm:inline">Sign Out</span>
+                  <span className="sm:hidden">Out</span>
                 </Button>
               </div>
             </div>
           </div>
 
-      <div className="container mx-auto px-4 py-6">
+      <div className="w-full px-4 py-6">
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
-              <TrendingUp className="h-4 w-4 text-destructive" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
+          <Card className="p-3 sm:p-4">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-0">
+              <CardTitle className="text-xs sm:text-sm font-medium truncate">Total Expenses</CardTitle>
+              <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-destructive flex-shrink-0" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-destructive">
+            <CardContent className="p-0 pt-2">
+              <div className="text-lg sm:text-xl lg:text-2xl font-bold text-destructive truncate">
                 ₹{stats.totalExpenses.toFixed(2)}
               </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Loaned</CardTitle>
-              <DollarSign className="h-4 w-4 text-orange-600" />
+          <Card className="p-3 sm:p-4">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-0">
+              <CardTitle className="text-xs sm:text-sm font-medium truncate">Total Loaned</CardTitle>
+              <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 text-orange-600 flex-shrink-0" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-orange-600">
+            <CardContent className="p-0 pt-2">
+              <div className="text-lg sm:text-xl lg:text-2xl font-bold text-orange-600 truncate">
                 ₹{stats.totalLoaned.toFixed(2)}
               </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Received</CardTitle>
-              <TrendingUp className="h-4 w-4 text-green-600" />
+          <Card className="p-3 sm:p-4">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-0">
+              <CardTitle className="text-xs sm:text-sm font-medium truncate">Total Received</CardTitle>
+              <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-green-600 flex-shrink-0" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">
+            <CardContent className="p-0 pt-2">
+              <div className="text-lg sm:text-xl lg:text-2xl font-bold text-green-600 truncate">
                 ₹{stats.totalReceived.toFixed(2)}
               </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active Loans</CardTitle>
-              <Users className="h-4 w-4 text-primary" />
+          <Card className="p-3 sm:p-4">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-0">
+              <CardTitle className="text-xs sm:text-sm font-medium truncate">Active Loans</CardTitle>
+              <Users className="h-3 w-3 sm:h-4 sm:w-4 text-primary flex-shrink-0" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.activeLoans}</div>
+            <CardContent className="p-0 pt-2">
+              <div className="text-lg sm:text-xl lg:text-2xl font-bold">{stats.activeLoans}</div>
             </CardContent>
           </Card>
         </div>
 
           {/* Main Content */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full" style={{ gridTemplateColumns: `repeat(${Object.values(tabSettings).filter(Boolean).length}, 1fr)` }}>
-              {tabSettings.expenses && <TabsTrigger value="expenses">Expenses</TabsTrigger>}
-              {tabSettings.loans && <TabsTrigger value="loans">Loans</TabsTrigger>}
-              {tabSettings.customers && <TabsTrigger value="customers">Customers</TabsTrigger>}
-              {tabSettings.sales && (
-                <>
-                  <TabsTrigger value="sales">
-                    <ShoppingCart className="h-4 w-4 mr-2" />
-                    Sales
-                  </TabsTrigger>
-                  <TabsTrigger value="sale-customers">Sale Customers</TabsTrigger>
-                </>
-              )}
-              {tabSettings.daywise && <TabsTrigger value="daywise">Daywise</TabsTrigger>}
-              {tabSettings.payments && <TabsTrigger value="payments">Payments</TabsTrigger>}
-            </TabsList>
+            <div className="overflow-x-auto">
+              <TabsList className="grid w-full min-w-max" style={{ gridTemplateColumns: `repeat(${Object.values(tabSettings).filter(Boolean).length}, 1fr)` }}>
+                {tabSettings.expenses && <TabsTrigger value="expenses" className="text-xs sm:text-sm">Expenses</TabsTrigger>}
+                {tabSettings.loans && <TabsTrigger value="loans" className="text-xs sm:text-sm">Loans</TabsTrigger>}
+                {tabSettings.customers && <TabsTrigger value="customers" className="text-xs sm:text-sm">Customers</TabsTrigger>}
+                {tabSettings.sales && (
+                  <>
+                    <TabsTrigger value="sales" className="text-xs sm:text-sm">
+                      <ShoppingCart className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                      <span className="hidden sm:inline">Sales</span>
+                      <span className="sm:hidden">Sales</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="sale-customers" className="text-xs sm:text-sm">
+                      <span className="hidden sm:inline">Sale Customers</span>
+                      <span className="sm:hidden">S. Customers</span>
+                    </TabsTrigger>
+                  </>
+                )}
+                {tabSettings.daywise && <TabsTrigger value="daywise" className="text-xs sm:text-sm">Daywise</TabsTrigger>}
+                {tabSettings.payments && <TabsTrigger value="payments" className="text-xs sm:text-sm">Payments</TabsTrigger>}
+              </TabsList>
+            </div>
 
             {tabSettings.expenses && (
-              <TabsContent value="expenses" className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-xl font-semibold">Your Expenses</h2>
+              <TabsContent value="expenses" className="space-y-4 mt-4">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0">
+                  <h2 className="text-lg sm:text-xl font-semibold">Your Expenses</h2>
                   <AddExpenseDialog onExpenseAdded={fetchStats} />
                 </div>
                 <ExpensesListEnhanced />
@@ -289,9 +296,9 @@ const Dashboard = () => {
             )}
 
             {tabSettings.loans && (
-              <TabsContent value="loans" className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-xl font-semibold">Loans & Lending</h2>
+              <TabsContent value="loans" className="space-y-4 mt-4">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0">
+                  <h2 className="text-lg sm:text-xl font-semibold">Loans & Lending</h2>
                   <AddLoanDialog onLoanAdded={fetchStats} />
                 </div>
                 <LoansList onUpdate={fetchStats} />
@@ -299,9 +306,9 @@ const Dashboard = () => {
             )}
 
             {tabSettings.customers && (
-              <TabsContent value="customers" className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-xl font-semibold">Customers</h2>
+              <TabsContent value="customers" className="space-y-4 mt-4">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0">
+                  <h2 className="text-lg sm:text-xl font-semibold">Customers</h2>
                   <AddCustomerDialog />
                 </div>
                 <CustomersList />
@@ -310,17 +317,17 @@ const Dashboard = () => {
 
             {tabSettings.sales && (
               <>
-                <TabsContent value="sales" className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <h2 className="text-xl font-semibold">Sales</h2>
+                <TabsContent value="sales" className="space-y-4 mt-4">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0">
+                    <h2 className="text-lg sm:text-xl font-semibold">Sales</h2>
                     <AddSaleDialog onSaleAdded={fetchStats} />
                   </div>
                   <SalesList onUpdate={fetchStats} />
                 </TabsContent>
 
-                <TabsContent value="sale-customers" className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <h2 className="text-xl font-semibold">Sale Customers</h2>
+                <TabsContent value="sale-customers" className="space-y-4 mt-4">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0">
+                    <h2 className="text-lg sm:text-xl font-semibold">Sale Customers</h2>
                   </div>
                   <SaleCustomersList />
                 </TabsContent>
@@ -328,9 +335,9 @@ const Dashboard = () => {
             )}
 
             {tabSettings.daywise && (
-              <TabsContent value="daywise" className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-xl font-semibold">Daywise Payment Schedule</h2>
+              <TabsContent value="daywise" className="space-y-4 mt-4">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0">
+                  <h2 className="text-lg sm:text-xl font-semibold">Daywise Payment Schedule</h2>
                   <AddCustomerDialog />
                 </div>
                 <DaywisePayment onUpdate={fetchStats} />
@@ -338,9 +345,9 @@ const Dashboard = () => {
             )}
 
             {tabSettings.payments && (
-              <TabsContent value="payments" className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-xl font-semibold">Date-wise Payment Records</h2>
+              <TabsContent value="payments" className="space-y-4 mt-4">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0">
+                  <h2 className="text-lg sm:text-xl font-semibold">Date-wise Payment Records</h2>
                 </div>
                 <DateWisePayments onUpdate={fetchStats} />
               </TabsContent>
