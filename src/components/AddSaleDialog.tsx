@@ -55,56 +55,108 @@ const AddSaleDialog = ({ onSaleAdded }: AddSaleDialogProps) => {
   const fetchCustomers = async () => {
     if (!user) return;
 
-    const { data, error } = await supabase
-      .from('customers')
-      .select('id, name, phone')
-      .eq('user_id', user.id)
-      .order('name');
+    try {
+      const { data, error } = await supabase
+        .from('customers')
+        .select('id, name, phone')
+        .eq('user_id', user.id)
+        .order('name');
 
-    if (error) {
-      console.error('Error fetching customers:', error);
-      return;
+      if (error) {
+        console.error('Error fetching customers:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load customers',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      console.log('Fetched customers:', data);
+      setCustomers(data || []);
+      
+      if (!data || data.length === 0) {
+        toast({
+          title: 'No Customers',
+          description: 'Please add customers first before creating sales',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('Unexpected error fetching customers:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load customers',
+        variant: 'destructive',
+      });
     }
-
-    setCustomers(data || []);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!user) return;
-
-    const { error } = await supabase.from('sales').insert({
-      user_id: user.id,
-      customer_id: formData.customer_id,
-      sale_amount: parseFloat(formData.sale_amount),
-      sale_description: formData.sale_description,
-      sale_date: formData.sale_date,
-    });
-
-    if (error) {
+    if (!user) {
       toast({
         title: 'Error',
-        description: 'Failed to add sale',
+        description: 'User not authenticated',
         variant: 'destructive',
       });
       return;
     }
 
-    toast({
-      title: 'Success',
-      description: 'Sale added successfully',
-    });
+    if (!formData.customer_id || !formData.sale_amount || !formData.sale_description) {
+      toast({
+        title: 'Error',
+        description: 'Please fill in all required fields',
+        variant: 'destructive',
+      });
+      return;
+    }
 
-    setFormData({
-      customer_id: '',
-      sale_amount: '',
-      sale_description: '',
-      sale_date: new Date().toISOString().split('T')[0],
-    });
+    try {
+      console.log('Submitting sale:', formData);
+      
+      const { data, error } = await supabase.from('sales').insert({
+        user_id: user.id,
+        customer_id: formData.customer_id,
+        sale_amount: parseFloat(formData.sale_amount),
+        sale_description: formData.sale_description,
+        sale_date: formData.sale_date,
+      }).select();
 
-    setOpen(false);
-    onSaleAdded?.();
+      if (error) {
+        console.error('Sale insert error:', error);
+        toast({
+          title: 'Error',
+          description: `Failed to add sale: ${error.message}`,
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      console.log('Sale added successfully:', data);
+      toast({
+        title: 'Success',
+        description: 'Sale added successfully',
+      });
+
+      setFormData({
+        customer_id: '',
+        sale_amount: '',
+        sale_description: '',
+        sale_date: new Date().toISOString().split('T')[0],
+      });
+
+      setOpen(false);
+      onSaleAdded?.();
+    } catch (error) {
+      console.error('Unexpected error:', error);
+      toast({
+        title: 'Error',
+        description: 'An unexpected error occurred',
+        variant: 'destructive',
+      });
+    }
   };
 
   return (
@@ -186,7 +238,12 @@ const AddSaleDialog = ({ onSaleAdded }: AddSaleDialogProps) => {
             </div>
           </div>
           <DialogFooter>
-            <Button type="submit">Add Sale</Button>
+            <Button 
+              type="submit" 
+              disabled={customers.length === 0}
+            >
+              {customers.length === 0 ? 'No Customers Available' : 'Add Sale'}
+            </Button>
           </DialogFooter>
         </form>
       </DialogContent>
