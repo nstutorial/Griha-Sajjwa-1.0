@@ -7,9 +7,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
 import { useAuth } from '@/contexts/AuthContext';
 import { Wallet } from 'lucide-react';
+import LoadingSpinner from '@/components/LoadingSpinner';
 
 const Auth = () => {
-  const { user, signIn, signUp } = useAuth();
+  const { user, signIn, signUp, loading } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
 
   const [signInData, setSignInData] = useState({
@@ -23,6 +24,11 @@ const Auth = () => {
     fullName: '',
     confirmPassword: '',
   });
+
+  // Show loading spinner while auth is initializing
+  if (loading) {
+    return <LoadingSpinner message="Loading authentication..." size="lg" />;
+  }
 
   if (user) {
     return <Navigate to="/" replace />;
