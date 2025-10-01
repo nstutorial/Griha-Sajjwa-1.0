@@ -63,14 +63,46 @@ const Dashboard = () => {
   const fetchTabSettings = async () => {
     if (!user) return;
 
-    const { data } = await supabase
-      .from('user_settings')
-      .select('visible_tabs')
-      .eq('user_id', user.id)
-      .maybeSingle();
+    try {
+      const { data, error } = await supabase
+        .from('user_settings')
+        .select('visible_tabs')
+        .eq('user_id', user.id)
+        .maybeSingle();
 
-    if (data) {
-      setTabSettings(data.visible_tabs as unknown as TabSettings);
+      if (error) {
+        console.error('Error fetching tab settings:', error);
+        return;
+      }
+
+      if (data) {
+        setTabSettings(data.visible_tabs as unknown as TabSettings);
+      } else {
+        // If no settings exist, create default settings
+        const defaultSettings = {
+          expenses: true,
+          loans: true,
+          customers: true,
+          sales: true,
+          daywise: true,
+          payments: true,
+        };
+        
+        const { error: insertError } = await supabase
+          .from('user_settings')
+          .insert({
+            user_id: user.id,
+            visible_tabs: defaultSettings,
+          });
+
+        if (insertError) {
+          console.error('Error creating default settings:', insertError);
+        } else {
+          setTabSettings(defaultSettings);
+        }
+      }
+    } catch (error) {
+      console.error('Error in fetchTabSettings:', error);
     }
   };
 
