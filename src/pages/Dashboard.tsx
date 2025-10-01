@@ -28,6 +28,7 @@ import AddSaleDialog from '@/components/AddSaleDialog';
 import SaleCustomersList from '@/components/SaleCustomersList';
 import SettingsDialog, { TabSettings } from '@/components/SettingsDialog';
 import { useToast } from '@/hooks/use-toast';
+import LoadingSpinner from '@/components/LoadingSpinner';
 
 interface DashboardStats {
   totalExpenses: number;
@@ -37,7 +38,7 @@ interface DashboardStats {
 }
 
 const Dashboard = () => {
-  const { user, signOut } = useAuth();
+  const { user, signOut, loading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [stats, setStats] = useState<DashboardStats>({
@@ -57,17 +58,8 @@ const Dashboard = () => {
     daywise: true,
     payments: true,
   });
-  
-  if (!user) {
-    return <Navigate to="/auth" replace />;
-  }
 
-  useEffect(() => {
-    if (user) {
-      fetchTabSettings();
-    }
-  }, [user]);
-
+  // Define functions before using them in useEffect
   const fetchTabSettings = async () => {
     if (!user) return;
 
@@ -81,27 +73,6 @@ const Dashboard = () => {
       setTabSettings(data.visible_tabs as unknown as TabSettings);
     }
   };
-
-  const handleSignOut = async () => {
-    try {
-      await signOut();
-      toast({
-        title: 'Signed out',
-        description: 'You have been signed out successfully',
-      });
-      navigate('/auth');
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to sign out',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  useEffect(() => {
-    fetchStats();
-  }, [user]);
 
   const fetchStats = async () => {
     if (!user) return;
@@ -142,6 +113,43 @@ const Dashboard = () => {
       console.error('Error fetching stats:', error);
     }
   };
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      toast({
+        title: 'Signed out',
+        description: 'You have been signed out successfully',
+      });
+      navigate('/auth');
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to sign out',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // All hooks must be called before any early returns
+  useEffect(() => {
+    if (user) {
+      fetchTabSettings();
+    }
+  }, [user]);
+
+  useEffect(() => {
+    fetchStats();
+  }, [user]);
+  
+  // Show loading spinner while auth is loading
+  if (loading) {
+    return <LoadingSpinner message="Initializing your dashboard..." size="lg" />;
+  }
+  
+  if (!user) {
+    return <Navigate to="/auth" replace />;
+  }
 
   return (
     <SidebarProvider>
