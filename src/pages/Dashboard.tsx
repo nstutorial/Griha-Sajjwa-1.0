@@ -22,6 +22,7 @@ import AddLoanDialog from '@/components/AddLoanDialog';
 import CustomersList from '@/components/CustomersList';
 import AddCustomerDialog from '@/components/AddCustomerDialog';
 import CustomerSummary from '@/components/CustomerSummary';
+import DaywiseCustomerManager from '@/components/DaywiseCustomerManager';
 import DaywisePayment from '@/components/DaywisePayment';
 import DateWisePayments from '@/components/DateWisePayments';
 import SalesList from '@/components/SalesList';
@@ -320,12 +321,16 @@ const Dashboard = () => {
                     <TabsList>
                       <TabsTrigger value="list">Customer List</TabsTrigger>
                       <TabsTrigger value="summary">Summary Report</TabsTrigger>
+                      <TabsTrigger value="payment-manager">Payment Manager</TabsTrigger>
                     </TabsList>
                     <TabsContent value="list" className="mt-4">
                       <CustomersList onUpdate={fetchStats} />
                     </TabsContent>
                     <TabsContent value="summary" className="mt-4">
                       <CustomerSummary />
+                    </TabsContent>
+                    <TabsContent value="payment-manager" className="mt-4">
+                      <DaywiseCustomerManager />
                     </TabsContent>
                   </Tabs>
                 </div>
