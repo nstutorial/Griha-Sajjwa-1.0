@@ -22,7 +22,11 @@ interface Customer {
   }>;
 }
 
-const CustomersList = () => {
+interface CustomersListProps {
+  onUpdate?: () => void;
+}
+
+const CustomersList = ({ onUpdate }: CustomersListProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -36,6 +40,17 @@ const CustomersList = () => {
       fetchCustomers();
     }
   }, [user]);
+
+  useEffect(() => {
+    const handleRefresh = () => {
+      fetchCustomers();
+      if (onUpdate) onUpdate();
+    };
+
+    window.addEventListener('refresh-customers', handleRefresh);
+    return () => window.removeEventListener('refresh-customers', handleRefresh);
+  }, [onUpdate]);
+
 
   const fetchCustomers = async () => {
     try {
@@ -116,6 +131,8 @@ const CustomersList = () => {
         title: "Customer deleted",
         description: "The customer has been successfully deleted.",
       });
+      
+      if (onUpdate) onUpdate();
     } catch (error) {
       console.error('Error deleting customer:', error);
       toast({
