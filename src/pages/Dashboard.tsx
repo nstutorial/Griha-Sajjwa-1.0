@@ -21,6 +21,7 @@ import LoansList from '@/components/LoansList';
 import AddLoanDialog from '@/components/AddLoanDialog';
 import CustomersList from '@/components/CustomersList';
 import AddCustomerDialog from '@/components/AddCustomerDialog';
+import CustomerSummary from '@/components/CustomerSummary';
 import DaywisePayment from '@/components/DaywisePayment';
 import DateWisePayments from '@/components/DateWisePayments';
 import SalesList from '@/components/SalesList';
@@ -305,14 +306,29 @@ const Dashboard = () => {
 
             {tabSettings.customers && (
               <TabsContent value="customers" className="space-y-4 mt-4">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0">
-                  <h2 className="text-lg sm:text-xl font-semibold">Customers</h2>
-                  <AddCustomerDialog onCustomerAdded={() => {
-                    // Trigger refresh for any components that need it
-                    window.dispatchEvent(new CustomEvent('refresh-customers'));
-                  }} />
+                <div className="space-y-4">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0">
+                    <h2 className="text-lg sm:text-xl font-semibold">Customers</h2>
+                    <AddCustomerDialog onCustomerAdded={() => {
+                      // Trigger refresh for any components that need it
+                      window.dispatchEvent(new CustomEvent('refresh-customers'));
+                    }} />
+                  </div>
+                  
+                  {/* Sub-tabs for Customers */}
+                  <Tabs defaultValue="list" className="w-full">
+                    <TabsList>
+                      <TabsTrigger value="list">Customer List</TabsTrigger>
+                      <TabsTrigger value="summary">Summary Report</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="list" className="mt-4">
+                      <CustomersList onUpdate={fetchStats} />
+                    </TabsContent>
+                    <TabsContent value="summary" className="mt-4">
+                      <CustomerSummary />
+                    </TabsContent>
+                  </Tabs>
                 </div>
-                <CustomersList onUpdate={fetchStats} />
               </TabsContent>
             )}
 
