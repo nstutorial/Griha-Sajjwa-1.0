@@ -58,6 +58,7 @@ const AddEarningDialog: React.FC<AddEarningDialogProps> = ({ onEarningAdded }) =
         .from('expense_categories')
         .select('id, name')
         .eq('user_id', user?.id)
+        .eq('type', 'income')
         .order('name');
 
       if (error) throw error;

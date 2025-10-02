@@ -58,6 +58,7 @@ const AddExpenseDialog: React.FC<AddExpenseDialogProps> = ({ onExpenseAdded }) =
         .from('expense_categories')
         .select('id, name')
         .eq('user_id', user?.id)
+        .eq('type', 'expense')
         .order('name');
 
       if (error) throw error;
