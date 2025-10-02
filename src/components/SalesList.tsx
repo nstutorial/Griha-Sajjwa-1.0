@@ -21,7 +21,7 @@ interface SalesListProps {
   onUpdate?: () => void;
 }
 
-const SalesList = ({ onUpdate }: SalesListProps) => {
+const SalesList: React.FC<SalesListProps> = ({ onUpdate }) => {
   const { user } = useAuth();
   const [sales, setSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
@@ -31,7 +31,7 @@ const SalesList = ({ onUpdate }: SalesListProps) => {
     if (user) {
       fetchSales();
     }
-  }, [user]);
+  }, [user, onUpdate]);
 
   const fetchSales = async () => {
     if (!user) return;
