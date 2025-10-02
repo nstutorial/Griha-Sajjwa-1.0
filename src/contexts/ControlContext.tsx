@@ -46,18 +46,42 @@ export const ControlProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
     setLoading(true);
     try {
-      // Temporarily skip database fetch until migration is applied
-      // Use defaults for now - settings will be available after user adds the column
-      console.log('Using default control settings (migration needed for database persistence)');
-      
-      setSettings({
-        allowEdit: true,
-        allowDelete: true,
-        allowAddNew: true,
-        allowExport: true,
-        showFinancialTotals: true,
-        allowBulkOperations: true,
-      });
+      const { data, error } = await supabase
+        .from('user_settings')
+
+
+        .select('control_settings')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (error) {
+        if (error.code === '42703') {
+          // Column doesn't exist - use defaults
+          console.log('control_settings column not found, using defaults');
+          setSettings({
+            allowEdit: true,
+            allowDelete: true,
+            allowAddNew: true,
+            allowExport: true,
+            showFinancialTotals: true,
+            allowBulkOperations: true,
+          });
+        } else {
+          throw error;
+        }
+      } else if (data && 'control_settings' in data) {
+        setSettings((data as any).control_settings);
+      } else {
+        // No data found - use defaults
+        setSettings({
+          allowEdit: true,
+          allowDelete: true,
+          allowAddNew: true,
+          allowExport: true,
+          showFinancialTotals: true,
+          allowBulkOperations: true,
+        });
+      }
       
     } catch (error) {
       console.error('Unexpected error fetching control settings:', error);
