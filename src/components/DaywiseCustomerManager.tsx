@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { ChevronDown, ChevronRight, DollarSign, Users, MapPin, Calendar, Phone } from 'lucide-react';
+import { ChevronDown, ChevronRight, Users, MapPin, Calendar, Phone } from 'lucide-react';
 
 interface Customer {
   id: string;
@@ -272,7 +272,7 @@ const DaywiseCustomerManager: React.FC = () => {
 
       toast({
         title: 'Payment Recorded',
-        description: `Payment of ₹${amount} recorded successfully for ${customer.name}`,
+        description: `Payment of ${amount} recorded successfully for ${customer.name}`,
       });
 
       fetchCustomers();
@@ -351,19 +351,18 @@ const DaywiseCustomerManager: React.FC = () => {
                     ) : (
                       <ChevronRight className="h-5 w-5 text-muted-foreground" />
                     )}
-                    <CardTitle className="flex items-center gap-2">
-                      <Calendar className="h-5 w-5 text-blue-600" />
-                      Payment Day: {dayGroup.paymentDay}
-                    </CardTitle>
+                    <div className="flex items-center gap-2 text-sm sm:text-base">
+                      <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
+                      <span className="font-medium">Payment Day: {dayGroup.paymentDay}</span>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <Badge variant="outline" className="flex items-center gap-1">
+                  <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
+                    <Badge variant="outline" className="flex items-center gap-1 text-xs">
                       <Users className="h-3 w-3" />
                       {totalCustomersInDay} customers
                     </Badge>
-                    <Badge variant={totalDayOutstanding > 0 ? "default" : "secondary"}>
-                      <DollarSign className="h-3 w-3 mr-1" />
-                      ₹{totalDayOutstanding.toFixed(2)}
+                    <Badge variant={totalDayOutstanding > 0 ? "default" : "secondary"} className="min-w-0 max-w-full px-2 py-1 text-xs">
+                      <span className="truncate">{totalDayOutstanding.toFixed(2)}</span>
                     </Badge>
                   </div>
                 </div>
@@ -371,36 +370,38 @@ const DaywiseCustomerManager: React.FC = () => {
 
               {/* Day Content - Address Groups */}
               {isDayExpanded && (
-                <CardContent className="pt-0">
-                  <div className="space-y-3">
+                <CardContent className="pt-0 pl-0 pr-0">
+                  <div className="space-y-2 ml-4 border-l-2 border-l-slate-200 pl-4">
                     {dayGroup.addressGroups.map((addressGroup) => {
                       const addressKey = `${dayGroup.paymentDay}-${addressGroup.address}`;
                       const totalAddressOutstanding = calculateAddressTotal(dayGroup.paymentDay, addressGroup.address);
                       const isAddressExpanded = expandedAddresses.has(addressKey);
 
                       return (
-                        <Card key={addressKey} className="border-l-4 border-l-green-500">
+                        <Card key={addressKey} className="border-l-4 border-l-green-500 bg-green-50/30 dark:bg-green-950/20">
                           {/* Address Header */}
                           <CardHeader 
-                            className="cursor-pointer hover:bg-muted/50 transition-colors pb-2"
+                            className="cursor-pointer hover:bg-green-100/50 dark:hover:bg-green-900/20 transition-colors pb-2 py-3"
                             onClick={() => toggleAddressExpansion(dayGroup.paymentDay, addressGroup.address)}
                           >
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
                               {isAddressExpanded ? (
-                                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                                <ChevronDown className="h-4 sm:h-5 w-4 sm:w-5 text-muted-foreground flex-shrink-0" />
                               ) : (
-                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                                <ChevronRight className="h-4 sm:h-5 w-4 sm:w-5 text-muted-foreground flex-shrink-0" />
                               )}
-                              <CardTitle className="flex items-center gap-2 text-base">
-                                <MapPin className="h-4 w-4 text-green-600" />
-                                {addressGroup.address}
-                              </CardTitle>
-                              <Badge variant="outline">
-                                {addressGroup.customers.length} customer{addressGroup.customers.length !== 1 ? 's' : ''}
-                              </Badge>
-                              <Badge variant={totalAddressOutstanding > 0 ? "default" : "secondary"}>
-                                ₹{totalAddressOutstanding.toFixed(2)}
-                              </Badge>
+                              <div className="flex items-center gap-2 text-sm sm:text-base">
+                                <MapPin className="h-3 w-3 sm:h-4 sm:w-4 text-green-600 flex-shrink-0" />
+                                <span className="font-medium">{addressGroup.address}</span>
+                              </div>
+                              <div className="flex items-center gap-2 ml-auto flex-wrap">
+                                <Badge variant="outline" className="text-xs">
+                                  {addressGroup.customers.length} customer{addressGroup.customers.length !== 1 ? 's' : ''}
+                                </Badge>
+                                <Badge variant={totalAddressOutstanding > 0 ? "default" : "secondary"} className="text-xs min-w-0">
+                                  <span className="truncate">{totalAddressOutstanding.toFixed(2)}</span>
+                                </Badge>
+                              </div>
                             </div>
                           </CardHeader>
 
@@ -428,7 +429,7 @@ const DaywiseCustomerManager: React.FC = () => {
                                             </div>
                                             <div className="text-right">
                                               <div className="text-lg font-medium text-orange-600">
-                                                ₹{customerOutstanding.toFixed(2)}
+                                                {customerOutstanding.toFixed(2)}
                                               </div>
                                               <div className="text-xs text-muted-foreground">
                                                 Outstanding Balance
@@ -461,7 +462,6 @@ const DaywiseCustomerManager: React.FC = () => {
                                                 }}
                                                 className="h-10"
                                               >
-                                                <DollarSign className="h-4 w-4 mr-2" />
                                                 Record Payment
                                               </Button>
                                             </div>
