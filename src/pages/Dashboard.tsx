@@ -318,10 +318,13 @@ const Dashboard = () => {
                   
                   {/* Sub-tabs for Customers */}
                   <Tabs defaultValue="list" className="w-full">
-                    <TabsList>
-                      <TabsTrigger value="list">Customer List</TabsTrigger>
-                      <TabsTrigger value="summary">Summary Report</TabsTrigger>
-                      <TabsTrigger value="payment-manager">Payment Manager</TabsTrigger>
+                    <TabsList className="grid grid-cols-3">
+                      <TabsTrigger value="list" className="text-xs sm:text-sm">Customer List</TabsTrigger>
+                      <TabsTrigger value="summary" className="text-xs sm:text-sm">Summary Report</TabsTrigger>
+                      <TabsTrigger value="payment-manager" className="text-xs sm:text-sm">
+                        <span className="hidden sm:inline">Payment Manager</span>
+                        <span className="sm:hidden">Payments</span>
+                      </TabsTrigger>
                     </TabsList>
                     <TabsContent value="list" className="mt-4">
                       <CustomersList onUpdate={fetchStats} />
