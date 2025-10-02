@@ -20,8 +20,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Users, DollarSign, Calendar, Plus, Eye } from 'lucide-react';
+import { Users, DollarSign, Calendar, Plus, Eye, Edit, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useControl } from '@/contexts/ControlContext';
+import EditLoanDialog from './EditLoanDialog';
 
 interface Loan {
   id: string;
@@ -55,12 +57,14 @@ interface LoansListProps {
 const LoansList: React.FC<LoansListProps> = ({ onUpdate }) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { settings: controlSettings } = useControl();
   const [loans, setLoans] = useState<Loan[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedLoan, setSelectedLoan] = useState<Loan | null>(null);
   const [transactions, setTransactions] = useState<LoanTransaction[]>([]);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [showLedgerDialog, setShowLedgerDialog] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
   const [paymentData, setPaymentData] = useState({
@@ -212,6 +216,46 @@ const LoansList: React.FC<LoansListProps> = ({ onUpdate }) => {
     setShowPaymentDialog(true);
   };
 
+  const handleEditLoan = (loan: Loan) => {
+    setSelectedLoan(loan);
+    setEditDialogOpen(true);
+  };
+
+  const handleQuickDelete = async (loan: Loan) => {
+    if (!confirm(`Are you sure you want to delete loan #${loan.loan_number} for ${loan.customers.name}? This action cannot be undone.`)) return;
+
+    try {
+      // First delete related transactions
+      await supabase
+        .from('loan_transactions')
+        .delete()
+        .eq('loan_id', loan.id);
+
+      // Then delete the loan
+      const { error } = await supabase
+        .from('loans')
+        .delete()
+        .eq('id', loan.id)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Loan deleted successfully!",
+      });
+
+      onUpdate();
+    } catch (error: any) {
+      console.error('Error deleting loan:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to delete loan.",
+        variant: "destructive",
+      });
+    }
+  };
+
   useEffect(() => {
     if (user && loans.length > 0) {
       const loanIds = loans.map(l => l.id);
@@ -320,18 +364,30 @@ const LoansList: React.FC<LoansListProps> = ({ onUpdate }) => {
                 </div>
               </div>
               
-              {!isClosed && (
-                <div className="flex space-x-2">
-                  <Button size="sm" onClick={() => showPayment(loan)}>
-                    <Plus className="h-4 w-4 mr-1" />
-                    Add Payment
+              <div className="flex space-x-2 flex-wrap">
+                {!isClosed && (
+                  <>
+                    <Button size="sm" onClick={() => showPayment(loan)}>
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add Payment
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => showLedger(loan)}>
+                      <Eye className="h-4 w-4 mr-1" />
+                      View Ledger
+                    </Button>
+                  </>
+                )}
+                {controlSettings.allowEdit && (
+                  <Button variant="outline" size="sm" onClick={() => handleEditLoan(loan)}>
+                    <Edit className="h-4 w-4" />
                   </Button>
-                  <Button variant="outline" size="sm" onClick={() => showLedger(loan)}>
-                    <Eye className="h-4 w-4 mr-1" />
-                    View Ledger
+                )}
+                {controlSettings.allowDelete && (
+                  <Button variant="destructive" size="sm" onClick={() => handleQuickDelete(loan)}>
+                    <Trash2 className="h-4 w-4" />
                   </Button>
-                </div>
-              )}
+                )}
+              </div>
             </CardContent>
           </Card>
         );
@@ -440,6 +496,14 @@ const LoansList: React.FC<LoansListProps> = ({ onUpdate }) => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Loan Dialog */}
+      <EditLoanDialog
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        loan={selectedLoan}
+        onLoanUpdated={onUpdate}
+      />
     </div>
   );
 };
