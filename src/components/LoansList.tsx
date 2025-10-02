@@ -20,7 +20,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Users, DollarSign, Calendar, Plus, Eye, Edit, Trash2 } from 'lucide-react';
+import { Users, DollarSign, Calendar, Plus, Eye, Edit, Trash2, FileText, Download } from 'lucide-react';
+import jsPDF from 'jspdf';
 import { useToast } from '@/hooks/use-toast';
 import { useControl } from '@/contexts/ControlContext';
 import EditLoanDialog from './EditLoanDialog';
@@ -222,6 +223,224 @@ const LoansList: React.FC<LoansListProps> = ({ onUpdate, status = 'active' }) =>
     setEditDialogOpen(true);
   };
 
+  const generateLoanStatement = async (loan: Loan) => {
+    try {
+      // Fetch all transactions for this loan
+      const { data: loanTransactions, error: transactionsError } = await supabase
+        .from('loan_transactions')
+        .select('*')
+        .eq('loan_id', loan.id)
+        .order('payment_date', { ascending: true });
+
+      if (transactionsError) throw transactionsError;
+
+      // Calculate loan details
+      const balance = calculateLoanBalance(loan.id);
+      const interest = calculateInterest(loan, balance);
+      const totalInterestPaid = loanTransactions?.filter(t => t.transaction_type === 'interest').reduce((sum, t) => sum + t.amount, 0) || 0;
+      const totalPrincipalPaid = loanTransactions?.filter(t => t.transaction_type === 'principal').reduce((sum, t) => sum + t.amount, 0) || 0;
+      const totalPaid = totalInterestPaid + totalPrincipalPaid;
+
+      // Generate statement content
+      const statementContent = `
+LOAN STATEMENT
+==============
+
+Client: ${loan.customers.name}
+Phone: ${loan.customers.phone || 'N/A'}
+Loan Number: ${loan.loan_number}
+Loan Date: ${new Date(loan.loan_date).toLocaleDateString()}
+${loan.due_date ? `Due Date: ${new Date(loan.due_date).toLocaleDateString()}` : ''}
+Interest Rate: ${loan.interest_type === 'none' ? 'No Interest' : `${loan.interest_rate}% ${loan.interest_type}`}
+
+LOAN DETAILS
+============
+Principal Amount: ${loan.principal_amount.toFixed(2)}
+Total Interest Charged: ${interest.toFixed(2)}
+Total Loan Amount: ${(loan.principal_amount + interest).toFixed(2)}
+
+PAYMENT SUMMARY
+===============
+Total Principal Paid: ${totalPrincipalPaid.toFixed(2)}
+Total Interest Paid: ${totalInterestPaid.toFixed(2)}
+Total Amount Paid: ${totalPaid.toFixed(2)}
+Outstanding Balance: ${balance.toFixed(2)}
+
+PAYMENT HISTORY
+===============
+${loanTransactions?.map(transaction => {
+  const date = new Date(transaction.payment_date).toLocaleDateString();
+  const type = transaction.transaction_type.charAt(0).toUpperCase() + transaction.transaction_type.slice(1);
+  return `${date} - ${type}: ${transaction.amount.toFixed(2)}${transaction.notes ? ` (${transaction.notes})` : ''}`;
+}).join('\n') || 'No payments recorded.'}
+
+STATUS: ${balance <= 0 ? 'CLOSED' : 'ACTIVE'}
+Generated on: ${new Date().toLocaleDateString()}
+      `.trim();
+
+      // Create and download the file
+      const blob = new Blob([statementContent], { type: 'text/plain' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `loan-statement-${loan.loan_number}-${loan.customers.name.replace(/\s+/g, '-').toLowerCase()}.txt`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: 'Statement Generated',
+        description: `Loan statement for ${loan.customers.name} has been downloaded.`,
+      });
+
+    } catch (error) {
+      console.error('Error generating loan statement:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to generate loan statement",
+      });
+    }
+  };
+
+  const generatePDFStatement = async (loan: Loan) => {
+    try {
+      // Fetch all transactions for this loan
+      const { data: loanTransactions, error: transactionsError } = await supabase
+        .from('loan_transactions')
+        .select('*')
+        .eq('loan_id', loan.id)
+        .order('payment_date', { ascending: true });
+
+      if (transactionsError) throw transactionsError;
+
+      // Calculate loan details
+      const balance = calculateLoanBalance(loan.id);
+      const interest = calculateInterest(loan, balance);
+      const totalInterestPaid = loanTransactions?.filter(t => t.transaction_type === 'interest').reduce((sum, t) => sum + t.amount, 0) || 0;
+      const totalPrincipalPaid = loanTransactions?.filter(t => t.transaction_type === 'principal').reduce((sum, t) => sum + t.amount, 0) || 0;
+      const totalPaid = totalInterestPaid + totalPrincipalPaid;
+
+      // Create new PDF document
+      const doc = new jsPDF();
+      
+      // Set title
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('LOAN STATEMENT', 105, 20, { align: 'center' });
+      
+      // Add line separator
+      doc.setLineWidth(0.5);
+      doc.line(20, 25, 190, 25);
+      
+      let yPosition = 35;
+      
+      // Client Information
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Client Information', 20, yPosition);
+      yPosition += 8;
+      
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Client: ${loan.customers.name}`, 20, yPosition);
+      yPosition += 6;
+      doc.text(`Phone: ${loan.customers.phone || 'N/A'}`, 20, yPosition);
+      yPosition += 6;
+      doc.text(`Loan Number: ${loan.loan_number}`, 20, yPosition);
+      yPosition += 6;
+      doc.text(`Loan Date: ${new Date(loan.loan_date).toLocaleDateString()}`, 20, yPosition);
+      yPosition += 6;
+      if (loan.due_date) {
+        doc.text(`Due Date: ${new Date(loan.due_date).toLocaleDateString()}`, 20, yPosition);
+        yPosition += 6;
+      }
+      doc.text(`Interest Rate: ${loan.interest_type === 'none' ? 'No Interest' : `${loan.interest_rate}% ${loan.interest_type}`}`, 20, yPosition);
+      yPosition += 15;
+      
+      // Loan Details
+      doc.setFont('helvetica', 'bold');
+      doc.text('Loan Details', 20, yPosition);
+      yPosition += 8;
+      
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Principal Amount: ${loan.principal_amount.toFixed(2)}`, 20, yPosition);
+      yPosition += 6;
+      doc.text(`Total Interest Charged: ${interest.toFixed(2)}`, 20, yPosition);
+      yPosition += 6;
+      doc.text(`Total Loan Amount: ${(loan.principal_amount + interest).toFixed(2)}`, 20, yPosition);
+      yPosition += 15;
+      
+      // Payment Summary
+      doc.setFont('helvetica', 'bold');
+      doc.text('Payment Summary', 20, yPosition);
+      yPosition += 8;
+      
+      doc.setFont('helvetica', 'normal');
+      doc.text(`Total Principal Paid: ${totalPrincipalPaid.toFixed(2)}`, 20, yPosition);
+      yPosition += 6;
+      doc.text(`Total Interest Paid: ${totalInterestPaid.toFixed(2)}`, 20, yPosition);
+      yPosition += 6;
+      doc.text(`Total Amount Paid: ${totalPaid.toFixed(2)}`, 20, yPosition);
+      yPosition += 6;
+      doc.text(`Outstanding Balance: ${balance.toFixed(2)}`, 20, yPosition);
+      yPosition += 15;
+      
+      // Payment History
+      doc.setFont('helvetica', 'bold');
+      doc.text('Payment History', 20, yPosition);
+      yPosition += 8;
+      
+      if (loanTransactions && loanTransactions.length > 0) {
+        doc.setFont('helvetica', 'normal');
+        loanTransactions.forEach(transaction => {
+          if (yPosition > 280) { // Add new page if needed
+            doc.addPage();
+            yPosition = 20;
+          }
+          const date = new Date(transaction.payment_date).toLocaleDateString();
+          const type = transaction.transaction_type.charAt(0).toUpperCase() + transaction.transaction_type.slice(1);
+          const line = `${date} - ${type}: ${transaction.amount.toFixed(2)}${transaction.notes ? ` (${transaction.notes})` : ''}`;
+          doc.text(line, 20, yPosition);
+          yPosition += 6;
+        });
+      } else {
+        doc.setFont('helvetica', 'normal');
+        doc.text('No payments recorded.', 20, yPosition);
+        yPosition += 6;
+      }
+      
+      yPosition += 10;
+      
+      // Status
+      doc.setFont('helvetica', 'bold');
+      doc.text(`STATUS: ${balance <= 0 ? 'CLOSED' : 'ACTIVE'}`, 20, yPosition);
+      yPosition += 10;
+      
+      // Generated date
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, yPosition);
+      
+      // Save the PDF
+      const pdfName = `loan-statement-${loan.loan_number}-${loan.customers.name.replace(/\s+/g, '-').toLowerCase()}.pdf`;
+      doc.save(pdfName);
+      
+      toast({
+        title: 'PDF Statement Generated',
+        description: `Loan statement for ${loan.customers.name} has been downloaded as PDF.`,
+      });
+
+    } catch (error) {
+      console.error('Error generating PDF statement:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to generate PDF statement",
+      });
+    }
+  };
+
   const handleQuickDelete = async (loan: Loan) => {
     if (!confirm(`Are you sure you want to delete loan #${loan.loan_number} for ${loan.customers.name}? This action cannot be undone.`)) return;
 
@@ -391,6 +610,18 @@ const LoansList: React.FC<LoansListProps> = ({ onUpdate, status = 'active' }) =>
                       View Ledger
                     </Button>
                   </>
+                )}
+                {isClosed && (
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={() => generateLoanStatement(loan)}>
+                      <FileText className="h-4 w-4 mr-1" />
+                      Text
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => generatePDFStatement(loan)}>
+                      <Download className="h-4 w-4 mr-1" />
+                      PDF
+                    </Button>
+                  </div>
                 )}
                 {controlSettings.allowEdit && (
                   <Button variant="outline" size="sm" onClick={() => handleEditLoan(loan)}>
