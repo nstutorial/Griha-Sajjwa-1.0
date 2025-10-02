@@ -23,6 +23,7 @@ import {
 import { Users, DollarSign, Calendar, Plus, Eye, Edit, Trash2, FileText, Download } from 'lucide-react';
 import jsPDF from 'jspdf';
 import { useToast } from '@/hooks/use-toast';
+import { PDFDownloader } from '@/lib/pdf-download';
 import { useControl } from '@/contexts/ControlContext';
 import EditLoanDialog from './EditLoanDialog';
 
@@ -422,9 +423,11 @@ Generated on: ${new Date().toLocaleDateString()}
       doc.setFontSize(10);
       doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, yPosition);
       
-      // Save the PDF
+      // MOBILE-FRIENDLY DOWNLOAD
       const pdfName = `loan-statement-${loan.loan_number}-${loan.customers.name.replace(/\s+/g, '-').toLowerCase()}.pdf`;
-      doc.save(pdfName);
+      const pdfBlob = doc.output('blob');
+      
+      await PDFDownloader.downloadPDF(pdfBlob, pdfName);
       
       toast({
         title: 'PDF Statement Generated',
