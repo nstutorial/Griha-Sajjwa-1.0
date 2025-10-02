@@ -297,11 +297,26 @@ const Dashboard = () => {
 
             {tabSettings.loans && (
               <TabsContent value="loans" className="space-y-4 mt-4">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0">
-                  <h2 className="text-lg sm:text-xl font-semibold">Loans & Lending</h2>
-                  <AddLoanDialog onLoanAdded={fetchStats} />
+                <div className="space-y-4">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0">
+                    <h2 className="text-lg sm:text-xl font-semibold">Loans & Lending</h2>
+                    <AddLoanDialog onLoanAdded={fetchStats} />
+                  </div>
+                  
+                  {/* Sub-tabs for Loans */}
+                  <Tabs defaultValue="active" className="w-full">
+                    <TabsList className="grid grid-cols-2">
+                      <TabsTrigger value="active" className="text-xs sm:text-sm">Active Loans</TabsTrigger>
+                      <TabsTrigger value="closed" className="text-xs sm:text-sm">Closed Loans</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="active" className="mt-4">
+                      <LoansList onUpdate={fetchStats} status="active" />
+                    </TabsContent>
+                    <TabsContent value="closed" className="mt-4">
+                      <LoansList onUpdate={fetchStats} status="closed" />
+                    </TabsContent>
+                  </Tabs>
                 </div>
-                <LoansList onUpdate={fetchStats} />
               </TabsContent>
             )}
 
