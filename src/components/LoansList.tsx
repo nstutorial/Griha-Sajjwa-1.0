@@ -52,9 +52,10 @@ interface LoanTransaction {
 
 interface LoansListProps {
   onUpdate: () => void;
+  status?: 'active' | 'closed';
 }
 
-const LoansList: React.FC<LoansListProps> = ({ onUpdate }) => {
+const LoansList: React.FC<LoansListProps> = ({ onUpdate, status = 'active' }) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const { settings: controlSettings } = useControl();
@@ -271,6 +272,16 @@ const LoansList: React.FC<LoansListProps> = ({ onUpdate }) => {
   }, [user, loans]);
 
   const filteredLoans = loans.filter(loan => {
+    // Filter by status first
+    const balance = calculateLoanBalance(loan.id);
+    const interest = calculateInterest(loan, balance);
+    const outstanding = balance + interest;
+    const isClosed = outstanding <= 0;
+    
+    if (status === 'active' && isClosed) return false;
+    if (status === 'closed' && !isClosed) return false;
+    
+    // Then filter by search query
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
     return (
@@ -299,7 +310,11 @@ const LoansList: React.FC<LoansListProps> = ({ onUpdate }) => {
         <Card>
           <CardContent className="py-8 text-center">
             <p className="text-muted-foreground">
-              {searchQuery ? 'No loans found matching your search.' : 'No loans recorded yet. Create your first loan!'}
+              {searchQuery 
+                ? 'No loans found matching your search.' 
+                : status === 'closed' 
+                  ? 'No closed loans yet.' 
+                  : 'No active loans yet. Create your first loan!'}
             </p>
           </CardContent>
         </Card>
