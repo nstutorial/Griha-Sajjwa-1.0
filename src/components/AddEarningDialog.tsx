@@ -122,9 +122,10 @@ const AddEarningDialog: React.FC<AddEarningDialogProps> = ({ onEarningAdded, onC
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline">
-          <Plus className="h-4 w-4 mr-2" />
-          Add Earning
+        <Button variant="outline" size="sm" className="text-xs sm:text-sm">
+          <Plus className="h-4 w-4 mr-1 sm:mr-2" />
+          <span className="hidden sm:inline">Add Earning</span>
+          <span className="sm:hidden">Add Earn</span>
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
