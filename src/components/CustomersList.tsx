@@ -198,7 +198,8 @@ const CustomersList = ({ onUpdate }: CustomersListProps) => {
     return (
       customer.name.toLowerCase().includes(query) ||
       customer.phone?.toLowerCase().includes(query) ||
-      customer.address?.toLowerCase().includes(query)
+      customer.address?.toLowerCase().includes(query) ||
+      customer.payment_day?.toLowerCase().includes(query)
     );
   });
 
@@ -219,7 +220,7 @@ const CustomersList = ({ onUpdate }: CustomersListProps) => {
     <div className="space-y-4">
       <div className="flex gap-2">
         <Input
-          placeholder="Search by name, phone, or address..."
+          placeholder="Search by name, phone, address, or payment day..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="max-w-md"
