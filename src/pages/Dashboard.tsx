@@ -48,7 +48,6 @@ const Dashboard = () => {
     activeLoans: 0,
   });
   const [activeTab, setActiveTab] = useState('expenses');
-  const [showProfile, setShowProfile] = useState(false);
   const [tabSettings, setTabSettings] = useState<TabSettings>({
     expenses: true,
     loans: true,
@@ -187,7 +186,7 @@ const Dashboard = () => {
       <div className="min-h-screen flex w-full overflow-x-hidden">
         <AppSidebar
           onSettingsClick={() => navigate('/settings')}
-          onProfileClick={() => setShowProfile(true)}
+          onProfileClick={() => navigate('/profile')}
         />
         
         <div className="flex-1 flex flex-col min-w-0">
