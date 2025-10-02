@@ -22,6 +22,9 @@ const config: CapacitorConfig = {
       androidSpinnerStyle: "large",
       iosSpinnerStyle: "small",
       spinnerColor: "#2563eb"
+    },
+    Filesystem: {
+      iosDataDirectory: "Documents"
     }
   }
 };
