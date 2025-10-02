@@ -10,7 +10,19 @@ const config: CapacitorConfig = {
   android: {
     allowMixedContent: true,
     captureInput: true,
-    webContentsDebuggingEnabled: false
+    webContentsDebuggingEnabled: false,
+    overrideUserAgent: 'MoneyTrackerProApp/1.0.0'
+  },
+  plugins: {
+    SplashScreen: {
+      launchShowDuration: 2000,
+      backgroundColor: "#ffffff",
+      androidSplashResourceName: "splash",
+      showSpinner: false,
+      androidSpinnerStyle: "large",
+      iosSpinnerStyle: "small",
+      spinnerColor: "#2563eb"
+    }
   }
 };
 
