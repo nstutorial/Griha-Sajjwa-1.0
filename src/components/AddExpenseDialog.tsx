@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -21,6 +22,7 @@ import {
 } from '@/components/ui/select';
 import { Plus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import CategoryManager from './CategoryManager';
 
 interface Category {
   id: string;
@@ -29,9 +31,10 @@ interface Category {
 
 interface AddExpenseDialogProps {
   onExpenseAdded: () => void;
+  onCategoryChange?: () => void;
 }
 
-const AddExpenseDialog: React.FC<AddExpenseDialogProps> = ({ onExpenseAdded }) => {
+const AddExpenseDialog: React.FC<AddExpenseDialogProps> = ({ onExpenseAdded, onCategoryChange }) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
@@ -103,6 +106,7 @@ const AddExpenseDialog: React.FC<AddExpenseDialogProps> = ({ onExpenseAdded }) =
       
       setOpen(false);
       onExpenseAdded();
+      if (onCategoryChange) onCategoryChange();
     } catch (error) {
       console.error('Error adding expense:', error);
       toast({
@@ -126,6 +130,9 @@ const AddExpenseDialog: React.FC<AddExpenseDialogProps> = ({ onExpenseAdded }) =
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Add New Expense</DialogTitle>
+          <DialogDescription>
+            Record a new expense transaction with amount, category, and payment method details.
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
@@ -153,7 +160,10 @@ const AddExpenseDialog: React.FC<AddExpenseDialogProps> = ({ onExpenseAdded }) =
           </div>
 
           <div className="space-y-2">
-            <Label>Category</Label>
+            <div className="flex justify-between items-center">
+              <Label>Category</Label>
+              <CategoryManager onCategoryChange={fetchCategories} />
+            </div>
             <Select value={formData.categoryId} onValueChange={(value) => setFormData({ ...formData, categoryId: value })}>
               <SelectTrigger>
                 <SelectValue placeholder="Select a category" />
