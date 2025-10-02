@@ -67,32 +67,57 @@ const Settings = () => {
     try {
       const { data, error } = await supabase
         .from('user_settings')
-        .select('visible_tabs')
+        .select('visible_tabs, control_settings')
         .eq('user_id', user.id)
         .maybeSingle();
 
       if (error) {
         console.error('Error fetching settings:', error);
-        toast({
-          title: 'Error',
-          description: 'Failed to load settings',
-          variant: 'destructive',
-        });
-        return;
+        
+        // Check if it's a column not found error
+        if (error.code === '42703') {
+          toast({
+            title: 'Migration Needed',
+            description: 'Control settings column missing. Please run the database migration.',
+            variant: 'destructive',
+          });
+          // Use defaults and don't return
+          setControlSettings({
+            allowEdit: true,
+            allowDelete: true,
+            allowAddNew: true,
+            allowExport: true,
+            showFinancialTotals: true,
+            allowBulkOperations: true,
+          });
+        } else {
+          toast({
+            title: 'Error',
+            description: 'Failed to load settings',
+            variant: 'destructive',
+          });
+          return;
+        }
       }
 
       if (data) {
-        const settings = data.visible_tabs as unknown as TabSettings;
+        const settings = (data as any)?.visible_tabs as unknown as TabSettings;
         setSettings(settings);
-        // Keep control settings at default values until migration is applied
-        setControlSettings({
-          allowEdit: true,
-          allowDelete: true,
-          allowAddNew: true,
-          allowExport: true,
-          showFinancialTotals: true,
-          allowBulkOperations: true,
-        });
+        
+        // Try to load control settings from database
+        if ((data as any)?.control_settings) {
+          setControlSettings((data as any).control_settings);
+        } else {
+          // Use defaults if control_settings not found
+          setControlSettings({
+            allowEdit: true,
+            allowDelete: true,
+            allowAddNew: true,
+            allowExport: true,
+            showFinancialTotals: true,
+            allowBulkOperations: true,
+          });
+        }
       } else {
         // If no settings exist, use defaults and create them
         const defaultSettings = {
@@ -239,22 +264,64 @@ const Settings = () => {
         throw fetchError;
       }
 
-      // Temporarily disable database operations for control settings until migration is applied
-      // For now, we'll just update the local state and show a temporary message
+      if (existingData) {
+        // Update existing record
+        const { error: updateError } = await supabase
+          .from('user_settings')
+          .update({
+            control_settings: newControlSettings,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('user_id', user.id);
+
+        if (updateError) {
+          console.error('Error updating control settings:', updateError);
+          throw updateError;
+        }
+      } else {
+        // Insert new record
+        const { error: insertError } = await supabase
+          .from('user_settings')
+          .insert({
+            user_id: user.id,
+            visible_tabs: settings as any,
+            control_settings: newControlSettings,
+            updated_at: new Date().toISOString(),
+          });
+
+        if (insertError) {
+          console.error('Error inserting control settings:', insertError);
+          throw insertError;
+        }
+      }
+
       toast({
-        title: 'Notice',
-        description: 'Control settings are saved locally. Database migration needed for persistence.',
+        title: 'Success',
+        description: 'Control settings updated successfully',
       });
+
+      // Refresh the global control context
+      refreshSettings();
 
     } catch (error) {
       console.error('Unexpected error updating control settings:', error);
       // Revert the local state on error
       setControlSettings(controlSettings);
-      toast({
-        title: 'Error',
-        description: 'An unexpected error occurred while updating control settings',
-        variant: 'destructive',
-      });
+      
+      // Check if it's a column not found error
+      if (error && typeof error === 'object' && 'code' in error && error.code === '42703') {
+        toast({
+          title: 'Database Migration Required',
+          description: 'The control_settings column needs to be added to your database. Please run the migration.',
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Error',
+          description: 'An unexpected error occurred while updating control settings',
+          variant: 'destructive',
+        });
+      }
     } finally {
       setIsUpdating(false);
     }
@@ -290,6 +357,7 @@ const Settings = () => {
         .upsert({
           user_id: user.id,
           visible_tabs: defaultSettings,
+          control_settings: defaultControls,
           updated_at: new Date().toISOString(),
         });
 
@@ -410,7 +478,29 @@ const Settings = () => {
                 Control the visibility of edit, delete, and other operations throughout the application
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
+            <CardContent>
+              <Card className="bg-yellow-50 border-yellow-200 mb-4">
+                <CardContent className="pt-4">
+                  <div className="flex items-start space-x-3">
+                    <div className="flex-shrink-0">
+                      <svg className="h-5 w-5 text-yellow-600 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-sm font-medium text-yellow-800">
+                        Database Migration Required
+                      </h3>
+                      <p className="text-sm text-yellow-700 mt-1">
+                        Controller settings may not persist after page refresh. Please run the database migration in 
+                        <code className="bg-yellow-100 px-1 rounded text-xs">DATABASE_MIGRATION_CONTROL_SETTINGS.md</code>
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <div className="space-y-6">
               <div className="grid gap-4">
                 {Object.entries(controlSettings).map(([key, value]) => (
                   <div key={key} className="flex items-center justify-between p-4 border rounded-lg">
@@ -440,6 +530,7 @@ const Settings = () => {
                     />
                   </div>
                 ))}
+              </div>
               </div>
             </CardContent>
           </Card>
