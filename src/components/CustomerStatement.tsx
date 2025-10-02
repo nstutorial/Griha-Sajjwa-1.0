@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Download, Calendar, IndianRupee, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 import jsPDF from 'jspdf';
+import { PDFDownloader } from '@/lib/pdf-download';
 
 interface Customer {
   id: string;
@@ -228,7 +229,7 @@ const CustomerStatement: React.FC<CustomerStatementProps> = ({ customer }) => {
     }).format(amount);
   };
 
-  const exportToPDF = () => {
+  const exportToPDF = async () => {
     try {
       // Create new PDF document - DIRECT DOWNLOAD, NO PRINT DIALOG
       const doc = new jsPDF();
@@ -465,9 +466,11 @@ const CustomerStatement: React.FC<CustomerStatementProps> = ({ customer }) => {
       runningY += 6;
       doc.text(`Total Transactions: ${statement.length}`, 25, runningY);
       
-      // DIRECT DOWNLOAD - NO PRINT DIALOG!
+      // MOBILE-FRIENDLY DOWNLOAD
       const pdfName = `customer-statement-${customer.name.replace(/\s+/g, '-').toLowerCase()}-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
-      doc.save(pdfName);
+      const pdfBlob = doc.output('blob');
+      
+      await PDFDownloader.downloadPDF(pdfBlob, pdfName);
       
       toast({
         title: 'PDF Downloaded',
