@@ -11,11 +11,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { Trash2, Edit } from 'lucide-react';
 
-interface Customer {
-  id: string;
-  name: string;
-  phone?: string;
-}
 
 interface Loan {
   id: string;
@@ -51,7 +46,6 @@ const EditLoanDialog: React.FC<EditLoanDialogProps> = ({
   const { toast } = useToast();
   const { settings: controlSettings } = useControl();
   const [loading, setLoading] = useState(false);
-  const [customers, setCustomers] = useState<Customer[]>([]);
   
   const [formData, setFormData] = useState({
     loan_number: '',
@@ -61,51 +55,29 @@ const EditLoanDialog: React.FC<EditLoanDialogProps> = ({
     loan_date: '',
     due_date: '',
     description: '',
-    customer_id: 'none',
+    customer_id: '',
   });
 
   useEffect(() => {
-    if (open && user) {
-      fetchCustomers();
-      if (loan) {
-        setFormData({
-          loan_number: loan.loan_number || '',
-          principal_amount: loan.principal_amount.toString(),
-          interest_rate: loan.interest_rate.toString(),
-          interest_type: loan.interest_type,
-          loan_date: loan.loan_date.split('T')[0],
-          due_date: loan.due_date ? loan.due_date.split('T')[0] : '',
-          description: loan.description || '',
-          customer_id: loan.customer_id || 'none',
-        });
-      }
+    if (open && user && loan) {
+      setFormData({
+        loan_number: loan.loan_number || '',
+        principal_amount: loan.principal_amount.toString(),
+        interest_rate: loan.interest_rate.toString(),
+        interest_type: loan.interest_type,
+        loan_date: loan.loan_date.split('T')[0],
+        due_date: loan.due_date ? loan.due_date.split('T')[0] : '',
+        description: loan.description || '',
+        customer_id: loan.customer_id,
+      });
     }
   }, [open, user, loan]);
 
-  const fetchCustomers = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('customers')
-        .select('id, name, phone')
-        .eq('user_id', user?.id)
-        .order('name');
-
-      if (error) throw error;
-      setCustomers(data || []);
-    } catch (error) {
-      console.error('Error fetching customers:', error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch customers.",
-        variant: "destructive",
-      });
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !loan) return;
-
+    
     setLoading(true);
     try {
       const { error } = await supabase
@@ -122,7 +94,7 @@ const EditLoanDialog: React.FC<EditLoanDialogProps> = ({
             ? new Date(formData.due_date).toISOString()
             : null,
           description: formData.description.trim() || null,
-          customer_id: formData.customer_id === 'none' ? null : formData.customer_id,
+          customer_id: formData.customer_id,
           updated_at: new Date().toISOString(),
         })
         .eq('id', loan.id)
@@ -229,26 +201,13 @@ const EditLoanDialog: React.FC<EditLoanDialogProps> = ({
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="customer">Customer *</Label>
-            <Select
-              value={formData.customer_id}
-              onValueChange={(value) =>
-                setFormData({ ...formData, customer_id: value })
-              }
-              required
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select customer" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Select a customer</SelectItem>
-                {customers.map((customer) => (
-                  <SelectItem key={customer.id} value={customer.id}>
-                    {customer.name} {customer.phone ? `(${customer.phone})` : ''}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Label>Customer</Label>
+            <div className="p-3 border rounded-md bg-muted/50">
+              <p className="font-medium">{loan?.customers.name}</p>
+              {loan?.customers.phone && (
+                <p className="text-sm text-muted-foreground">{loan.customers.phone}</p>
+              )}
+            </div>
           </div>
 
           <div className="space-y-2">
