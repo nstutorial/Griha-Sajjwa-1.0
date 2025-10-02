@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -21,6 +22,7 @@ import {
 } from '@/components/ui/select';
 import { Plus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import CategoryManager from './CategoryManager';
 
 interface Category {
   id: string;
@@ -29,9 +31,10 @@ interface Category {
 
 interface AddEarningDialogProps {
   onEarningAdded: () => void;
+  onCategoryChange?: () => void;
 }
 
-const AddEarningDialog: React.FC<AddEarningDialogProps> = ({ onEarningAdded }) => {
+const AddEarningDialog: React.FC<AddEarningDialogProps> = ({ onEarningAdded, onCategoryChange }) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
@@ -103,6 +106,7 @@ const AddEarningDialog: React.FC<AddEarningDialogProps> = ({ onEarningAdded }) =
       
       setOpen(false);
       onEarningAdded();
+      if (onCategoryChange) onCategoryChange();
     } catch (error) {
       console.error('Error adding earning:', error);
       toast({
@@ -126,6 +130,9 @@ const AddEarningDialog: React.FC<AddEarningDialogProps> = ({ onEarningAdded }) =
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Add New Earning</DialogTitle>
+          <DialogDescription>
+            Record a new income transaction with amount, category, and payment method details.
+          </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
@@ -153,7 +160,10 @@ const AddEarningDialog: React.FC<AddEarningDialogProps> = ({ onEarningAdded }) =
           </div>
 
           <div className="space-y-2">
-            <Label>Category</Label>
+            <div className="flex justify-between items-center">
+              <Label>Category</Label>
+              <CategoryManager onCategoryChange={fetchCategories} />
+            </div>
             <Select value={formData.categoryId} onValueChange={(value) => setFormData({ ...formData, categoryId: value })}>
               <SelectTrigger>
                 <SelectValue placeholder="Select a category" />
