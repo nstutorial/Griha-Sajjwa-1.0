@@ -26,7 +26,7 @@ import DateWisePayments from '@/components/DateWisePayments';
 import SalesList from '@/components/SalesList';
 import AddSaleDialog from '@/components/AddSaleDialog';
 import SaleCustomersList from '@/components/SaleCustomersList';
-import SettingsDialog, { TabSettings } from '@/components/SettingsDialog';
+import { TabSettings } from '@/pages/Settings';
 import { useToast } from '@/hooks/use-toast';
 import LoadingSpinner from '@/components/LoadingSpinner';
 
@@ -48,7 +48,6 @@ const Dashboard = () => {
     activeLoans: 0,
   });
   const [activeTab, setActiveTab] = useState('expenses');
-  const [showSettings, setShowSettings] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [tabSettings, setTabSettings] = useState<TabSettings>({
     expenses: true,
@@ -187,7 +186,7 @@ const Dashboard = () => {
     <SidebarProvider>
       <div className="min-h-screen flex w-full overflow-x-hidden">
         <AppSidebar
-          onSettingsClick={() => setShowSettings(true)}
+          onSettingsClick={() => navigate('/settings')}
           onProfileClick={() => setShowProfile(true)}
         />
         
@@ -288,8 +287,8 @@ const Dashboard = () => {
             {tabSettings.expenses && (
               <TabsContent value="expenses" className="space-y-4 mt-4">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0">
-                  <h2 className="text-lg sm:text-xl font-semibold">Your Expenses</h2>
-                  <AddExpenseDialog onExpenseAdded={fetchStats} />
+                  <h2 className="text-lg sm:text-xl font-semibold">Your Expenses & Earnings</h2>
+                  {/* <AddExpenseDialog onExpenseAdded={fetchStats} /> */}
                 </div>
                 <ExpensesListEnhanced />
               </TabsContent>
@@ -309,9 +308,12 @@ const Dashboard = () => {
               <TabsContent value="customers" className="space-y-4 mt-4">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0">
                   <h2 className="text-lg sm:text-xl font-semibold">Customers</h2>
-                  <AddCustomerDialog />
+                  <AddCustomerDialog onCustomerAdded={() => {
+                    // Trigger refresh for any components that need it
+                    window.dispatchEvent(new CustomEvent('refresh-customers'));
+                  }} />
                 </div>
-                <CustomersList />
+                <CustomersList onUpdate={fetchStats} />
               </TabsContent>
             )}
 
@@ -338,7 +340,9 @@ const Dashboard = () => {
               <TabsContent value="daywise" className="space-y-4 mt-4">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0">
                   <h2 className="text-lg sm:text-xl font-semibold">Daywise Payment Schedule</h2>
-                  <AddCustomerDialog />
+                  <AddCustomerDialog onCustomerAdded={() => {
+                    window.dispatchEvent(new CustomEvent('refresh-customers'));
+                  }} />
                 </div>
                 <DaywisePayment onUpdate={fetchStats} />
               </TabsContent>
@@ -356,11 +360,6 @@ const Dashboard = () => {
         </div>
       </div>
 
-      <SettingsDialog
-        open={showSettings}
-        onOpenChange={setShowSettings}
-        onSettingsUpdate={setTabSettings}
-      />
     </div>
     </SidebarProvider>
   );
