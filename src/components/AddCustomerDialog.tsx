@@ -22,7 +22,11 @@ import {
 import { Plus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
-const AddCustomerDialog = () => {
+interface AddCustomerDialogProps {
+  onCustomerAdded?: () => void;
+}
+
+const AddCustomerDialog = ({ onCustomerAdded }: AddCustomerDialogProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
@@ -66,8 +70,7 @@ const AddCustomerDialog = () => {
       });
       
       setOpen(false);
-      // Trigger a refresh by emitting a custom event
-      window.dispatchEvent(new CustomEvent('customer-added'));
+      if (onCustomerAdded) onCustomerAdded();
     } catch (error) {
       console.error('Error adding customer:', error);
       toast({
