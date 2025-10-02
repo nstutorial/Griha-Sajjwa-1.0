@@ -5,9 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Phone, Trash2, MapPin, Eye, Calendar } from 'lucide-react';
+import { Phone, Trash2, MapPin, Eye, Calendar, Edit } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useControl } from '@/contexts/ControlContext';
 import CustomerDetails from './CustomerDetails';
+import EditCustomerDialog from './EditCustomerDialog';
 
 interface Customer {
   id: string;
@@ -29,9 +31,12 @@ interface CustomersListProps {
 const CustomersList = ({ onUpdate }: CustomersListProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { settings: controlSettings } = useControl();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [customerToEdit, setCustomerToEdit] = useState<Customer | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [allTransactions, setAllTransactions] = useState<any[]>([]);
 
@@ -141,6 +146,11 @@ const CustomersList = ({ onUpdate }: CustomersListProps) => {
         description: "Failed to delete customer",
       });
     }
+  };
+
+  const handleEditCustomer = (customer: Customer) => {
+    setCustomerToEdit(customer);
+    setEditDialogOpen(true);
   };
 
   const calculateLoanBalance = (loan: any) => {
@@ -260,14 +270,25 @@ const CustomersList = ({ onUpdate }: CustomersListProps) => {
                   >
                     <Eye className="h-4 w-4" />
                   </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => deleteCustomer(customer.id)}
-                    className="text-destructive hover:text-destructive"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  {controlSettings.allowEdit && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleEditCustomer(customer)}
+                    >
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                  )}
+                  {controlSettings.allowDelete && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => deleteCustomer(customer.id)}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
               </div>
             </CardHeader>
@@ -310,6 +331,20 @@ const CustomersList = ({ onUpdate }: CustomersListProps) => {
           </Card>
         );
       })}
+
+      {/* Edit Customer Dialog */}
+      <EditCustomerDialog
+        open={editDialogOpen}
+        onOpenChange={(open) => {
+          setEditDialogOpen(open);
+          if (!open) setCustomerToEdit(null);
+        }}
+        customer={customerToEdit}
+        onCustomerUpdated={() => {
+          fetchCustomers();
+          if (onUpdate) onUpdate();
+        }}
+      />
     </div>
   );
 };
