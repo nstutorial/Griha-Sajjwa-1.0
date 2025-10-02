@@ -198,7 +198,7 @@ const DaywisePayment: React.FC<DaywisePaymentProps> = ({ onUpdate }) => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-full overflow-hidden">
       {/* Header */}
       <div className="text-center">
         <h2 className="text-2xl font-bold mb-2">Daywise Payment Schedule</h2>
@@ -222,20 +222,20 @@ const DaywisePayment: React.FC<DaywisePaymentProps> = ({ onUpdate }) => {
                 const outstandingBalance = calculateCustomerOutstanding(customer);
                 return (
                   <div key={customer.id} className="flex items-center justify-between p-3 bg-primary/5 rounded-lg border border-primary/20">
-                    <div className="flex items-center gap-3">
+                    <div className="flex-1 min-w-0 pr-3">
                       <div>
-                        <p className="font-medium">{customer.name}</p>
+                        <p className="font-medium truncate">{customer.name}</p>
                         {customer.phone && (
-                          <p className="text-sm text-muted-foreground flex items-center gap-1">
+                          <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
                             <Phone className="h-3 w-3" />
                             {customer.phone}
                           </p>
                         )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 flex-shrink-0">
                       <div className="text-right">
-                        <p className="font-medium text-primary">{formatCurrency(outstandingBalance)}</p>
+                        <p className="font-medium text-primary text-sm">{formatCurrency(outstandingBalance)}</p>
                         <Badge variant="outline" className="text-xs">
                           Outstanding
                         </Badge>
@@ -244,6 +244,7 @@ const DaywisePayment: React.FC<DaywisePaymentProps> = ({ onUpdate }) => {
                         size="sm"
                         variant="outline"
                         onClick={() => setSelectedCustomer(customer)}
+                        className="flex-shrink-0"
                       >
                         <Eye className="h-4 w-4" />
                       </Button>
@@ -261,13 +262,13 @@ const DaywisePayment: React.FC<DaywisePaymentProps> = ({ onUpdate }) => {
       </Card>
 
       {/* Weekly Schedule */}
-      <div className="grid gap-4">
+      <div className="grid gap-4 w-full">
         {getUpcomingDays().map((day, index) => {
           const dayCustomers = getCustomersByDay(day);
           const isToday = day === getCurrentDay();
           
           return (
-            <Card key={day} className={isToday ? "border-primary/50" : ""}>
+            <Card key={day} className={`w-full ${isToday ? "border-primary/50" : ""}`}>
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -289,28 +290,28 @@ const DaywisePayment: React.FC<DaywisePaymentProps> = ({ onUpdate }) => {
                       const outstandingBalance = calculateCustomerOutstanding(customer);
                       return (
                         <div key={customer.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50">
-                          <div className="flex items-center gap-3">
+                          <div className="flex-1 min-w-0 pr-3">
                             <div>
-                              <p className="font-medium">{customer.name}</p>
-                              <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                              <p className="font-medium truncate">{customer.name}</p>
+                              <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
                                 {customer.phone && (
-                                  <span className="flex items-center gap-1">
+                                  <span className="flex items-center gap-1 flex-shrink-0">
                                     <Phone className="h-3 w-3" />
-                                    {customer.phone}
+                                    <span className="text-xs">{customer.phone}</span>
                                   </span>
                                 )}
                                 {customer.address && (
-                                  <span className="flex items-center gap-1">
+                                  <span className="flex items-center gap-1 flex-shrink-0">
                                     <MapPin className="h-3 w-3" />
-                                    {customer.address}
+                                    <span className="text-xs truncate">{customer.address}</span>
                                   </span>
                                 )}
                               </div>
                             </div>
                           </div>
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-3 flex-shrink-0">
                             <div className="text-right">
-                              <p className="font-medium">{formatCurrency(outstandingBalance)}</p>
+                              <p className="font-medium text-sm">{formatCurrency(outstandingBalance)}</p>
                               <Badge variant="outline" className="text-xs">
                                 Outstanding
                               </Badge>
@@ -319,10 +320,11 @@ const DaywisePayment: React.FC<DaywisePaymentProps> = ({ onUpdate }) => {
                               size="sm"
                               variant="outline"
                               onClick={() => setSelectedCustomer(customer)}
+                              className="flex-shrink-0"
                             >
                               <Eye className="h-4 w-4" />
                             </Button>
-                          </div>
+                            </div>
                         </div>
                       );
                     })}
