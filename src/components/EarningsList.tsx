@@ -1,16 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Input } from '@/components/ui/input';
 import { Search } from 'lucide-react';
 import { format } from 'date-fns';
-import AddExpenseDialog from './AddExpenseDialog';
-import AddEarningDialog from './AddEarningDialog';
-import EarningsList from './EarningsList';
 
-interface Expense {
+interface Earning {
   id: string;
   amount: number;
   description: string;
@@ -26,22 +22,25 @@ interface CategorySummary {
   total: number;
 }
 
-const ExpensesListEnhanced = () => {
+interface EarningsListProps {
+  onRefresh?: () => void;
+}
+
+const EarningsList: React.FC<EarningsListProps> = ({ onRefresh }) => {
   const { user } = useAuth();
-  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [earnings, setEarnings] = useState<Earning[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
-  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     if (user) {
-      fetchExpenses();
+      fetchEarnings();
     }
-  }, [user, refreshKey]);
+  }, [user, onRefresh]);
 
-  const fetchExpenses = async () => {
+  const fetchEarnings = async () => {
     if (!user) return;
 
     setLoading(true);
@@ -52,72 +51,56 @@ const ExpensesListEnhanced = () => {
         category:expense_categories(name)
       `)
       .eq('user_id', user.id)
-      .eq('type', 'expense')
+      .eq('type', 'earning')
       .order('date', { ascending: false });
 
     if (error) {
-      console.error('Error fetching expenses:', error);
+      console.error('Error fetching earnings:', error);
     } else {
-      setExpenses(data || []);
+      setEarnings(data || []);
     }
     setLoading(false);
   };
 
-  const filteredExpenses = expenses.filter((expense) => {
+  const filteredEarnings = earnings.filter((earning) => {
     const matchesSearch =
-      expense.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (expense.category?.name || '').toLowerCase().includes(searchTerm.toLowerCase());
+      earning.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (earning.category?.name || '').toLowerCase().includes(searchTerm.toLowerCase());
 
-    const expenseDate = new Date(expense.date);
-    const matchesDateFrom = !dateFrom || expenseDate >= new Date(dateFrom);
-    const matchesDateTo = !dateTo || expenseDate <= new Date(dateTo);
+    const earningDate = new Date(earning.date);
+    const matchesDateFrom = !dateFrom || earningDate >= new Date(dateFrom);
+    const matchesDateTo = !dateTo || earningDate <= new Date(dateTo);
 
     return matchesSearch && matchesDateFrom && matchesDateTo;
   });
 
-  const categorySummary: CategorySummary[] = filteredExpenses.reduce((acc, expense) => {
-    const category = expense.category?.name || 'Uncategorized';
+  const categorySummary: CategorySummary[] = filteredEarnings.reduce((acc, earning) => {
+    const category = earning.category?.name || 'Uncategorized';
     const existing = acc.find((item) => item.category === category);
     if (existing) {
-      existing.total += Number(expense.amount);
+      existing.total += Number(earning.amount);
     } else {
-      acc.push({ category, total: Number(expense.amount) });
+      acc.push({ category, total: Number(earning.amount) });
     }
     return acc;
   }, [] as CategorySummary[]);
 
-  const totalExpenses = filteredExpenses.reduce(
-    (sum, expense) => sum + Number(expense.amount),
+  const totalEarnings = filteredEarnings.reduce(
+    (sum, earning) => sum + Number(earning.amount),
     0
   );
 
-  const handleRefresh = () => {
-    setRefreshKey(prev => prev + 1);
-  };
-
   if (loading) {
-    return <div>Loading...</div>;
+    return <div>Loading earnings...</div>;
   }
 
   return (
-    <Tabs defaultValue="expenses" className="space-y-4">
-      <div className="flex items-center justify-between">
-        <TabsList>
-          <TabsTrigger value="expenses">Expenses</TabsTrigger>
-          <TabsTrigger value="earnings">Earnings</TabsTrigger>
-        </TabsList>
-        <div className="flex gap-2">
-          <AddExpenseDialog onExpenseAdded={handleRefresh} />
-          <AddEarningDialog onEarningAdded={handleRefresh} />
-        </div>
-      </div>
-
-      <TabsContent value="expenses" className="space-y-4">
-        <div className="grid gap-4 md:grid-cols-3">
+    <div className="space-y-4">
+      <div className="grid gap-4 md:grid-cols-3">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search expenses..."
+            placeholder="Search earnings..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
@@ -146,53 +129,48 @@ const ExpensesListEnhanced = () => {
             {categorySummary.map((item) => (
               <div key={item.category} className="flex justify-between items-center">
                 <span className="text-sm">{item.category}</span>
-                <span className="font-semibold">₹{item.total.toFixed(2)}</span>
+                <span className="font-semibold text-green-600">₹{item.total.toFixed(2)}</span>
               </div>
             ))}
             <div className="pt-2 border-t flex justify-between items-center font-bold">
               <span>Total</span>
-              <span className="text-destructive">₹{totalExpenses.toFixed(2)}</span>
+              <span className="text-green-600">₹{totalEarnings.toFixed(2)}</span>
             </div>
           </div>
         </CardContent>
       </Card>
 
       <div className="grid gap-4">
-        {filteredExpenses.length === 0 ? (
+        {filteredEarnings.length === 0 ? (
           <Card>
             <CardContent className="text-center py-8 text-muted-foreground">
-              No expenses found
+              No earnings found
             </CardContent>
           </Card>
         ) : (
-          filteredExpenses.map((expense) => (
-            <Card key={expense.id}>
+          filteredEarnings.map((earning) => (
+            <Card key={earning.id}>
               <CardHeader>
                 <CardTitle className="flex justify-between items-center">
-                  <span>{expense.description}</span>
-                  <span className="text-destructive">₹{expense.amount.toFixed(2)}</span>
+                  <span>{earning.description}</span>
+                  <span className="text-green-600">₹{earning.amount.toFixed(2)}</span>
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="flex justify-between items-center text-sm text-muted-foreground">
-                  <span>{expense.category?.name || 'Uncategorized'}</span>
-                  <span>{format(new Date(expense.date), 'dd MMM yyyy')}</span>
+                  <span>{earning.category?.name || 'Uncategorized'}</span>
+                  <span>{format(new Date(earning.date), 'dd MMM yyyy')}</span>
                 </div>
                 <div className="text-xs text-muted-foreground mt-1">
-                  Payment: {expense.payment_method}
+                  Payment: {earning.payment_method}
                 </div>
               </CardContent>
             </Card>
           ))
         )}
       </div>
-      </TabsContent>
-
-      <TabsContent value="earnings">
-        <EarningsList onRefresh={handleRefresh} />
-      </TabsContent>
-    </Tabs>
+    </div>
   );
 };
 
-export default ExpensesListEnhanced;
+export default EarningsList;

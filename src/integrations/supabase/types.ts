@@ -77,6 +77,7 @@ export type Database = {
           description: string
           id: string
           payment_method: Database["public"]["Enums"]["payment_method"]
+          type: string
           updated_at: string
           user_id: string
         }
@@ -88,6 +89,7 @@ export type Database = {
           description: string
           id?: string
           payment_method: Database["public"]["Enums"]["payment_method"]
+          type?: string
           updated_at?: string
           user_id: string
         }
@@ -99,6 +101,7 @@ export type Database = {
           description?: string
           id?: string
           payment_method?: Database["public"]["Enums"]["payment_method"]
+          type?: string
           updated_at?: string
           user_id?: string
         }

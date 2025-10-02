@@ -27,11 +27,11 @@ interface Category {
   name: string;
 }
 
-interface AddExpenseDialogProps {
-  onExpenseAdded: () => void;
+interface AddEarningDialogProps {
+  onEarningAdded: () => void;
 }
 
-const AddExpenseDialog: React.FC<AddExpenseDialogProps> = ({ onExpenseAdded }) => {
+const AddEarningDialog: React.FC<AddEarningDialogProps> = ({ onEarningAdded }) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
@@ -82,14 +82,14 @@ const AddExpenseDialog: React.FC<AddExpenseDialogProps> = ({ onExpenseAdded }) =
           category_id: formData.categoryId || null,
           payment_method: formData.paymentMethod,
           date: formData.date,
-          type: 'expense',
+          type: 'earning',
         });
 
       if (error) throw error;
 
       toast({
-        title: "Expense added",
-        description: "Your expense has been successfully recorded.",
+        title: "Earning added",
+        description: "Your earning has been successfully recorded.",
       });
 
       setFormData({
@@ -101,13 +101,13 @@ const AddExpenseDialog: React.FC<AddExpenseDialogProps> = ({ onExpenseAdded }) =
       });
       
       setOpen(false);
-      onExpenseAdded();
+      onEarningAdded();
     } catch (error) {
-      console.error('Error adding expense:', error);
+      console.error('Error adding earning:', error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to add expense. Please try again.",
+        description: "Failed to add earning. Please try again.",
       });
     } finally {
       setLoading(false);
@@ -117,14 +117,14 @@ const AddExpenseDialog: React.FC<AddExpenseDialogProps> = ({ onExpenseAdded }) =
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>
+        <Button variant="outline">
           <Plus className="h-4 w-4 mr-2" />
-          Add Expense
+          Add Earning
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Add New Expense</DialogTitle>
+          <DialogTitle>Add New Earning</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
@@ -144,7 +144,7 @@ const AddExpenseDialog: React.FC<AddExpenseDialogProps> = ({ onExpenseAdded }) =
             <Label htmlFor="description">Description</Label>
             <Textarea
               id="description"
-              placeholder="What did you spend on?"
+              placeholder="What did you earn from?"
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               required
@@ -195,7 +195,7 @@ const AddExpenseDialog: React.FC<AddExpenseDialogProps> = ({ onExpenseAdded }) =
           </div>
 
           <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? 'Adding...' : 'Add Expense'}
+            {loading ? 'Adding...' : 'Add Earning'}
           </Button>
         </form>
       </DialogContent>
@@ -203,4 +203,4 @@ const AddExpenseDialog: React.FC<AddExpenseDialogProps> = ({ onExpenseAdded }) =
   );
 };
 
-export default AddExpenseDialog;
+export default AddEarningDialog;
