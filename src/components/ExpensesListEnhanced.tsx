@@ -149,13 +149,13 @@ const ExpensesListEnhanced = () => {
   return (
     <>
       <Tabs defaultValue="expenses" className="space-y-4">
-      <div className="flex items-center justify-between">
-        <TabsList>
-          <TabsTrigger value="expenses">Expenses</TabsTrigger>
-          <TabsTrigger value="earnings">Earnings</TabsTrigger>
-          <TabsTrigger value="balance-sheet">Balance Sheet</TabsTrigger>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
+        <TabsList className="w-full sm:w-auto">
+          <TabsTrigger value="expenses" className="text-xs sm:text-sm">Expenses</TabsTrigger>
+          <TabsTrigger value="earnings" className="text-xs sm:text-sm">Earnings</TabsTrigger>
+          <TabsTrigger value="balance-sheet" className="text-xs sm:text-sm">Balance Sheet</TabsTrigger>
         </TabsList>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <AddExpenseDialog onExpenseAdded={handleRefresh} />
           <AddEarningDialog onEarningAdded={handleRefresh} />
         </div>
