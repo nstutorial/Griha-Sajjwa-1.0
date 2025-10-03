@@ -2,9 +2,13 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { useControl } from '@/contexts/ControlContext';
 import { Input } from '@/components/ui/input';
-import { Search } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Search, Edit, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
+import { useToast } from '@/hooks/use-toast';
+import EditEarningDialog from './EditEarningDialog';
 
 interface Earning {
   id: string;
@@ -12,6 +16,7 @@ interface Earning {
   description: string;
   date: string;
   payment_method: 'cash' | 'bank';
+  category_id: string | null;
   category: {
     name: string;
   } | null;
@@ -28,11 +33,15 @@ interface EarningsListProps {
 
 const EarningsList: React.FC<EarningsListProps> = ({ onRefresh }) => {
   const { user } = useAuth();
+  const { settings: controlSettings } = useControl();
+  const { toast } = useToast();
   const [earnings, setEarnings] = useState<Earning[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [selectedEarning, setSelectedEarning] = useState<Earning | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -89,6 +98,49 @@ const EarningsList: React.FC<EarningsListProps> = ({ onRefresh }) => {
     (sum, earning) => sum + Number(earning.amount),
     0
   );
+
+  const handleEditEarning = (earning: Earning) => {
+    if (!controlSettings.allowEdit) return;
+    setSelectedEarning(earning);
+    setEditDialogOpen(true);
+  };
+
+  const handleQuickDelete = async (earning: Earning) => {
+    if (!controlSettings.allowDelete || !user) return;
+
+    const confirmed = window.confirm(`Are you sure you want to delete "${earning.description}"? This action cannot be undone.`);
+    if (!confirmed) return;
+
+    try {
+      const { error } = await supabase
+        .from('expenses')
+        .delete()
+        .eq('id', earning.id)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Earning deleted",
+        description: "The earning has been successfully deleted.",
+      });
+
+      fetchEarnings();
+      if (onRefresh) onRefresh();
+    } catch (error) {
+      console.error('Error deleting earning:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to delete earning. Please try again.",
+      });
+    }
+  };
+
+  const handleEarningUpdated = () => {
+    fetchEarnings();
+    if (onRefresh) onRefresh();
+  };
 
   if (loading) {
     return <div>Loading earnings...</div>;
@@ -153,7 +205,35 @@ const EarningsList: React.FC<EarningsListProps> = ({ onRefresh }) => {
               <CardHeader>
                 <CardTitle className="flex justify-between items-center">
                   <span>{earning.description}</span>
-                  <span className="text-green-600">₹{earning.amount.toFixed(2)}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-green-600">₹{earning.amount.toFixed(2)}</span>
+                    {(controlSettings.allowEdit || controlSettings.allowDelete) && (
+                      <div className="flex gap-1">
+                        {controlSettings.allowEdit && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditEarning(earning)}
+                            className="h-8 w-8 p-0"
+                            title="Edit earning"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {controlSettings.allowDelete && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleQuickDelete(earning)}
+                            className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                            title="Delete earning"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -169,6 +249,13 @@ const EarningsList: React.FC<EarningsListProps> = ({ onRefresh }) => {
           ))
         )}
       </div>
+
+      <EditEarningDialog
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        earning={selectedEarning}
+        onEarningUpdated={handleEarningUpdated}
+      />
     </div>
   );
 };
