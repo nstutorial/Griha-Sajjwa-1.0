@@ -13,6 +13,7 @@ import AddEarningDialog from './AddEarningDialog';
 import EditExpenseDialog from './EditExpenseDialog';
 import EarningsList from './EarningsList';
 import BalanceSheet from './BalanceSheet';
+import CategoryManager from './CategoryManager';
 import { useControl } from '@/contexts/ControlContext';
 import { useToast } from '@/hooks/use-toast';
 
@@ -44,6 +45,7 @@ const ExpensesListEnhanced = () => {
   const [refreshKey, setRefreshKey] = useState(0);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
+  const [activeTab, setActiveTab] = useState('expenses');
 
   useEffect(() => {
     if (user) {
@@ -148,7 +150,7 @@ const ExpensesListEnhanced = () => {
 
   return (
     <>
-      <Tabs defaultValue="expenses" className="space-y-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
         <TabsList className="w-full sm:w-auto">
           <TabsTrigger value="expenses" className="text-xs sm:text-sm">Expenses</TabsTrigger>
@@ -158,6 +160,7 @@ const ExpensesListEnhanced = () => {
         <div className="flex gap-2 flex-wrap">
           <AddExpenseDialog onExpenseAdded={handleRefresh} />
           <AddEarningDialog onEarningAdded={handleRefresh} />
+          <CategoryManager onCategoryChange={handleRefresh} />
         </div>
       </div>
 
