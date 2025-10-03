@@ -23,7 +23,8 @@ import {
 import { Users, DollarSign, Calendar, Plus, Eye, Edit, Trash2, FileText, Download } from 'lucide-react';
 import jsPDF from 'jspdf';
 import { useToast } from '@/hooks/use-toast';
-import { PDFDownloader } from '@/lib/pdf-download';
+import { format } from 'date-fns';
+import { saveAs } from 'file-saver';
 import { useControl } from '@/contexts/ControlContext';
 import EditLoanDialog from './EditLoanDialog';
 
@@ -305,137 +306,165 @@ Generated on: ${new Date().toLocaleDateString()}
     }
   };
 
+
+
+  const downloadPDF = (blob: Blob, filename: string) => {
+    saveAs(blob, filename);
+  };
+  
+  const formatNumber = (value: number) => {
+    return value.toLocaleString("en-IN", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  };
+
+  
   const generatePDFStatement = async (loan: Loan) => {
     try {
       // Fetch all transactions for this loan
       const { data: loanTransactions, error: transactionsError } = await supabase
-        .from('loan_transactions')
-        .select('*')
-        .eq('loan_id', loan.id)
-        .order('payment_date', { ascending: true });
-
+        .from("loan_transactions")
+        .select("*")
+        .eq("loan_id", loan.id)
+        .order("payment_date", { ascending: true });
+  
       if (transactionsError) throw transactionsError;
-
+  
       // Calculate loan details
       const balance = calculateLoanBalance(loan.id);
       const interest = calculateInterest(loan, balance);
-      const totalInterestPaid = loanTransactions?.filter(t => t.transaction_type === 'interest').reduce((sum, t) => sum + t.amount, 0) || 0;
-      const totalPrincipalPaid = loanTransactions?.filter(t => t.transaction_type === 'principal').reduce((sum, t) => sum + t.amount, 0) || 0;
+      const totalInterestPaid =
+        loanTransactions?.filter((t) => t.transaction_type === "interest")
+          .reduce((sum, t) => sum + t.amount, 0) || 0;
+      const totalPrincipalPaid =
+        loanTransactions?.filter((t) => t.transaction_type === "principal")
+          .reduce((sum, t) => sum + t.amount, 0) || 0;
       const totalPaid = totalInterestPaid + totalPrincipalPaid;
-
+  
       // Create new PDF document
       const doc = new jsPDF();
-      
-      // Set title
+  
+      // Title
       doc.setFontSize(18);
-      doc.setFont('helvetica', 'bold');
-      doc.text('LOAN STATEMENT', 105, 20, { align: 'center' });
-      
-      // Add line separator
+      doc.setFont("courier", "bold");
+      doc.text("LOAN STATEMENT", 105, 20, { align: "center" });
+  
+      // Line separator
       doc.setLineWidth(0.5);
       doc.line(20, 25, 190, 25);
-      
+  
       let yPosition = 35;
-      
-      // Client Information
+  
+      // Client Info
       doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Client Information', 20, yPosition);
+      doc.setFont("courier", "bold");
+      doc.text("Client Information", 20, yPosition);
       yPosition += 8;
-      
-      doc.setFont('helvetica', 'normal');
+  
+      doc.setFont("courier", "normal");
       doc.text(`Client: ${loan.customers.name}`, 20, yPosition);
       yPosition += 6;
-      doc.text(`Phone: ${loan.customers.phone || 'N/A'}`, 20, yPosition);
+      doc.text(`Phone: ${loan.customers.phone || "N/A"}`, 20, yPosition);
       yPosition += 6;
       doc.text(`Loan Number: ${loan.loan_number}`, 20, yPosition);
       yPosition += 6;
-      doc.text(`Loan Date: ${new Date(loan.loan_date).toLocaleDateString()}`, 20, yPosition);
+      doc.text(`Loan Date: ${format(new Date(loan.loan_date), "dd/MM/yyyy")}`, 20, yPosition);
       yPosition += 6;
       if (loan.due_date) {
-        doc.text(`Due Date: ${new Date(loan.due_date).toLocaleDateString()}`, 20, yPosition);
+        doc.text(`Due Date: ${format(new Date(loan.due_date), "dd/MM/yyyy")}`, 20, yPosition);
         yPosition += 6;
       }
-      doc.text(`Interest Rate: ${loan.interest_type === 'none' ? 'No Interest' : `${loan.interest_rate}% ${loan.interest_type}`}`, 20, yPosition);
+      doc.text(
+        `Interest Rate: ${
+          loan.interest_type === "none" ? "No Interest" : `${loan.interest_rate}% ${loan.interest_type}`
+        }`,
+        20,
+        yPosition
+      );
       yPosition += 15;
-      
+  
       // Loan Details
-      doc.setFont('helvetica', 'bold');
-      doc.text('Loan Details', 20, yPosition);
+      doc.setFont("courier", "bold");
+      doc.text("Loan Details", 20, yPosition);
       yPosition += 8;
-      
-      doc.setFont('helvetica', 'normal');
-      doc.text(`Principal Amount: ${loan.principal_amount.toFixed(2)}`, 20, yPosition);
+  
+      doc.setFont("courier", "normal");
+      doc.text(`Principal Amount: ${formatNumber(loan.principal_amount)}`, 20, yPosition);
       yPosition += 6;
-      doc.text(`Total Interest Charged: ${interest.toFixed(2)}`, 20, yPosition);
+      doc.text(`Total Interest Charged: ${formatNumber(interest)}`, 20, yPosition);
       yPosition += 6;
-      doc.text(`Total Loan Amount: ${(loan.principal_amount + interest).toFixed(2)}`, 20, yPosition);
+      doc.text(`Total Loan Amount: ${formatNumber(loan.principal_amount + interest)}`, 20, yPosition);
       yPosition += 15;
-      
+  
       // Payment Summary
-      doc.setFont('helvetica', 'bold');
-      doc.text('Payment Summary', 20, yPosition);
+      doc.setFont("courier", "bold");
+      doc.text("Payment Summary", 20, yPosition);
       yPosition += 8;
-      
-      doc.setFont('helvetica', 'normal');
-      doc.text(`Total Principal Paid: ${totalPrincipalPaid.toFixed(2)}`, 20, yPosition);
+  
+      doc.setFont("courier", "normal");
+      doc.text(`Total Principal Paid: ${formatNumber(totalPrincipalPaid)}`, 20, yPosition);
       yPosition += 6;
-      doc.text(`Total Interest Paid: ${totalInterestPaid.toFixed(2)}`, 20, yPosition);
+      doc.text(`Total Interest Paid: ${formatNumber(totalInterestPaid)}`, 20, yPosition);
       yPosition += 6;
-      doc.text(`Total Amount Paid: ${totalPaid.toFixed(2)}`, 20, yPosition);
+      doc.text(`Total Amount Paid: ${formatNumber(totalPaid)}`, 20, yPosition);
       yPosition += 6;
-      doc.text(`Outstanding Balance: ${balance.toFixed(2)}`, 20, yPosition);
+      doc.text(`Outstanding Balance: ${formatNumber(balance)}`, 20, yPosition);
       yPosition += 15;
-      
+  
       // Payment History
-      doc.setFont('helvetica', 'bold');
-      doc.text('Payment History', 20, yPosition);
+      doc.setFont("courier", "bold");
+      doc.text("Payment History", 20, yPosition);
       yPosition += 8;
-      
+  
       if (loanTransactions && loanTransactions.length > 0) {
-        doc.setFont('helvetica', 'normal');
-        loanTransactions.forEach(transaction => {
-          if (yPosition > 280) { // Add new page if needed
+        doc.setFont("courier", "normal");
+        loanTransactions.forEach((transaction) => {
+          if (yPosition > 280) {
             doc.addPage();
             yPosition = 20;
           }
-          const date = new Date(transaction.payment_date).toLocaleDateString();
-          const type = transaction.transaction_type.charAt(0).toUpperCase() + transaction.transaction_type.slice(1);
-          const line = `${date} - ${type}: ${transaction.amount.toFixed(2)}${transaction.notes ? ` (${transaction.notes})` : ''}`;
+          const date = format(new Date(transaction.payment_date), "dd/MM/yyyy");
+          const type =
+            transaction.transaction_type.charAt(0).toUpperCase() +
+            transaction.transaction_type.slice(1);
+          const line = `${date} - ${type}: ${formatNumber(transaction.amount)}${
+            transaction.notes ? ` (${transaction.notes})` : ""
+          }`;
           doc.text(line, 20, yPosition);
           yPosition += 6;
         });
       } else {
-        doc.setFont('helvetica', 'normal');
-        doc.text('No payments recorded.', 20, yPosition);
+        doc.setFont("courier", "normal");
+        doc.text("No payments recorded.", 20, yPosition);
         yPosition += 6;
       }
-      
+  
       yPosition += 10;
-      
+  
       // Status
-      doc.setFont('helvetica', 'bold');
-      doc.text(`STATUS: ${balance <= 0 ? 'CLOSED' : 'ACTIVE'}`, 20, yPosition);
+      doc.setFont("courier", "bold");
+      doc.text(`STATUS: ${balance <= 0 ? "CLOSED" : "ACTIVE"}`, 20, yPosition);
       yPosition += 10;
-      
+  
       // Generated date
-      doc.setFont('helvetica', 'normal');
+      doc.setFont("courier", "normal");
       doc.setFontSize(10);
-      doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 20, yPosition);
-      
-      // MOBILE-FRIENDLY DOWNLOAD
-      const pdfName = `loan-statement-${loan.loan_number}-${loan.customers.name.replace(/\s+/g, '-').toLowerCase()}.pdf`;
-      const pdfBlob = doc.output('blob');
-      
-      await PDFDownloader.downloadPDF(pdfBlob, pdfName);
-      
+      doc.text(`Generated on: ${format(new Date(), "dd/MM/yyyy")}`, 20, yPosition);
+  
+      // Save PDF
+      const pdfName = `loan-statement-${loan.loan_number}-${loan.customers.name
+        .replace(/\s+/g, "-")
+        .toLowerCase()}.pdf`;
+      const pdfBlob = doc.output("blob");
+      downloadPDF(pdfBlob, pdfName);
+  
       toast({
-        title: 'PDF Statement Generated',
+        title: "PDF Statement Generated",
         description: `Loan statement for ${loan.customers.name} has been downloaded as PDF.`,
       });
-
     } catch (error) {
-      console.error('Error generating PDF statement:', error);
+      console.error("Error generating PDF statement:", error);
       toast({
         variant: "destructive",
         title: "Error",
