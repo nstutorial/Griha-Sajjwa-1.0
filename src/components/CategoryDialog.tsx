@@ -82,6 +82,31 @@ const CategoryDialog: React.FC<CategoryDialogProps> = ({
 
     setLoading(true);
     try {
+      // Check for duplicate category names within the same type
+      const { data: existingCategories, error: checkError } = await supabase
+        .from('expense_categories')
+        .select('id, name')
+        .eq('user_id', user.id)
+        .eq('type', formData.type)
+        .ilike('name', formData.name.trim());
+
+      if (checkError) throw checkError;
+
+      // Check if there's a duplicate (excluding the current category if updating)
+      const duplicate = existingCategories?.find(
+        (cat) => cat.name.toLowerCase() === formData.name.trim().toLowerCase() && 
+        (!category || cat.id !== category.id)
+      );
+
+      if (duplicate) {
+        toast({
+          variant: "destructive",
+          title: "Duplicate category",
+          description: `A ${formData.type} category with this name already exists. Please choose a different name.`,
+        });
+        return;
+      }
+
       if (category) {
         // Update existing category
         const { error } = await supabase
@@ -122,12 +147,22 @@ const CategoryDialog: React.FC<CategoryDialogProps> = ({
 
       onOpenChange(false);
       onCategoryChange();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving category:', error);
+      
+      // Handle specific database constraint errors
+      let errorMessage = category ? "Failed to update category. Please try again." : "Failed to create category. Please try again.";
+      
+      if (error.code === '23505') { // Unique constraint violation
+        errorMessage = `A ${formData.type} category with this name already exists. Please choose a different name.`;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       toast({
         variant: "destructive",
         title: "Error",
-        description: category ? "Failed to update category. Please try again." : "Failed to create category. Please try again.",
+        description: errorMessage,
       });
     } finally {
       setLoading(false);
