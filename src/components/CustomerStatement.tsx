@@ -77,7 +77,7 @@ const CustomerStatement: React.FC<CustomerStatementProps> = ({ customer }) => {
   }, [user, customer.id]);
 
   useEffect(() => {
-    if (loans.length > 0 && transactions.length > 0) {
+    if (loans.length > 0) {
       generateStatement();
     }
   }, [loans, transactions, startDate, endDate]);
@@ -97,18 +97,22 @@ const CustomerStatement: React.FC<CustomerStatementProps> = ({ customer }) => {
       if (loansError) throw loansError;
       setLoans(loansData || []);
 
-      // Fetch transactions
-      const { data: transactionsData, error: transactionsError } = await supabase
-        .from('loan_transactions')
-        .select(`
-          *,
-          loan:loans(loan_number, description)
-        `)
-        .in('loan_id', (loansData || []).map(l => l.id))
-        .order('payment_date', { ascending: true });
+      // Fetch transactions (only if there are loans)
+      if (loansData && loansData.length > 0) {
+        const { data: transactionsData, error: transactionsError } = await supabase
+          .from('loan_transactions')
+          .select(`
+            *,
+            loan:loans(loan_number, description)
+          `)
+          .in('loan_id', loansData.map(l => l.id))
+          .order('payment_date', { ascending: true });
 
-      if (transactionsError) throw transactionsError;
-      setTransactions(transactionsData || []);
+        if (transactionsError) throw transactionsError;
+        setTransactions(transactionsData || []);
+      } else {
+        setTransactions([]);
+      }
 
     } catch (error) {
       console.error('Error fetching customer data:', error);
