@@ -10,7 +10,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Download, Calendar, IndianRupee, FileText } from 'lucide-react';
 import { format } from 'date-fns';
 import jsPDF from 'jspdf';
-import { PDFDownloader } from '@/lib/pdf-download';
+import { saveAs } from "file-saver";
+
 
 interface Customer {
   id: string;
@@ -137,7 +138,6 @@ const CustomerStatement: React.FC<CustomerStatementProps> = ({ customer }) => {
       if (isInRange) {
         allEntries.push({
           date: loan.loan_date,
-          // description: `Loan - ${loan.description || 'Loan'} (${loan.loan_number})`,
            description: `Loan - ${loan.description}`,
           reference: loan.loan_number,
           debit: loan.principal_amount,
@@ -231,254 +231,175 @@ const CustomerStatement: React.FC<CustomerStatementProps> = ({ customer }) => {
 
   const exportToPDF = async () => {
     try {
-      // Create new PDF document - DIRECT DOWNLOAD, NO PRINT DIALOG
-      const doc = new jsPDF();
-      
-      // Header section - exact format from image
-      doc.setFontSize(16);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Customer Statement', 105, 20, { align: 'center' });
-      
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.text(customer.name, 105, 30, { align: 'center' });
-      
-      // Add thick underline exactly like image
-      doc.setLineWidth(2);
-      doc.line(30, 35, 180, 35);
-      
-      let yPosition = 45;
-      
-      // Customer Information section
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      doc.text(`Customer: ${customer.name}`, 20, yPosition);
-      yPosition += 6;
-      doc.text(`Phone: ${customer.phone || 'N/A'}`, 20, yPosition);
-      yPosition += 6;
-      doc.text(`Address: ${customer.address || 'N/A'}`, 20, yPosition);
-      yPosition += 6;
-      doc.text(`Statement Period: ${startDate ? format(new Date(startDate), 'dd/MM/yyyy') : 'All'} - ${endDate ? format(new Date(endDate), 'dd/MM/yyyy') : 'Current'}`, 20, yPosition);
-      yPosition += 15;
-      
-      // Statement Table with proper sizing - fits page width
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'bold');
-      
-      const pageWidth = 210; // A4 page width in mm
+      const doc = new jsPDF("p", "mm", "a4"); // Portrait, mm, A4
+      const pageWidth = doc.internal.pageSize.width;
+      const pageHeight = doc.internal.pageSize.height;
       const margin = 20;
-      const tableWidth = pageWidth - (margin * 2); // 170mm total width
-      const tableStart = margin;
-      
-      // Adjusted column widths to fit better - increased date column
-      const colWidths = [30, 40, 18, 25, 25, 32]; // Total: 170mm
-      let colX = tableStart;
-      
-      // Draw header row with better positioning
-      doc.text('Date', colX + colWidths[0]/2, yPosition, { align: 'center' });
-      colX += colWidths[0];
-      doc.text('Description', colX + 8, yPosition);
-      colX += colWidths[1];
-      doc.text('Ref', colX + colWidths[2]/2, yPosition, { align: 'center' });
-      colX += colWidths[2];
-      doc.text('Debit', colX + colWidths[3]/2, yPosition, { align: 'center' });
-      colX += colWidths[3];
-      doc.text('Credit', colX + colWidths[4]/2, yPosition, { align: 'center' });
-      colX += colWidths[4];
-      doc.text('Balance', colX + colWidths[5]/2, yPosition, { align: 'center' });
-      
-      // Draw table border for header
+      const tableWidth = pageWidth - margin * 2;
+  
+      // ---------------- HEADER ----------------
+      doc.setFontSize(16).setFont("helvetica", "bold");
+      doc.text("Customer Statement", pageWidth / 2, 20, { align: "center" });
+  
+      doc.setFontSize(14);
+      doc.text(customer.name, pageWidth / 2, 30, { align: "center" });
+  
       doc.setLineWidth(0.5);
-      doc.rect(tableStart, yPosition - 5, tableWidth, 8);
-      
-      // Add column separators
-      colX = tableStart;
-      for (let i = 0; i < colWidths.length - 1; i++) {
-        colX += colWidths[i];
-        doc.line(colX, yPosition - 5, colX, yPosition + 3);
-      }
-      
-      yPosition += 8;
-      
-      // Statement entries
-      doc.setFont('helvetica', 'normal');
-      let runningY = yPosition;
-      
-      statement.forEach((entry, index) => {
-        // Calculate estimated row height before processing
-        const estimatedDescLines = entry.description.length > 25 ? Math.ceil(entry.description.length / 25) : 1;
-        const estimatedRowHeight = Math.max(8, estimatedDescLines * 4.5 + 6);
-        
-        // Check if we need a new page before adding this row
-        if (runningY + estimatedRowHeight > 270) { // Add new page if needed
-          doc.addPage();
-          runningY = 20;
-          
-          // Redraw headers on new page
-          doc.setFontSize(9);
-          doc.setFont('helvetica', 'bold');
-          colX = tableStart;
-          doc.text('Date', colX + colWidths[0]/2, runningY, { align: 'center' });
-          colX += colWidths[0];
-          doc.text('Description', colX + 8, runningY);
-          colX += colWidths[1];
-          doc.text('Ref', colX + colWidths[2]/2, runningY, { align: 'center' });
-          colX += colWidths[2];
-          doc.text('Debit', colX + colWidths[3]/2, runningY, { align: 'center' });
-          colX += colWidths[3];
-          doc.text('Credit', colX + colWidths[4]/2, runningY, { align: 'center' });
-          colX += colWidths[4];
-          doc.text('Balance', colX + colWidths[5]/2, runningY, { align: 'center' });
-          
-          doc.rect(tableStart, runningY - 5, tableWidth, 8);
-          colX = tableStart;
-          for (let i = 0; i < colWidths.length - 1; i++) {
-            colX += colWidths[i];
-            doc.line(colX, runningY - 5, colX, runningY + 3);
-          }
-          runningY += 8;
-          doc.setFont('helvetica', 'normal');
-        }
-        
-        const date = format(new Date(entry.date), 'dd/MM/yyyy');
-        
-        // Improved text wrapping for description column
-        const maxDescLength = 25; // Reduced for better fit
-        let description = entry.description;
-        const lines: any[] = [];
-        
-        // Split description into multiple lines if too long
-        if (description.length > maxDescLength) {
-          const words = description.split(' ');
-          let currentLine = '';
-          for (const word of words) {
-            if (currentLine.length + word.length + 1 > maxDescLength) {
-              if (currentLine.trim()) {
-                lines.push(currentLine.trim());
-              }
-              currentLine = word + ' ';
-              if (word.length > maxDescLength) {
-                // Handle very long words
-                lines.push(word.substring(0, maxDescLength - 3) + '...');
-                currentLine = '';
-              }
-            } else {
-              currentLine += word + ' ';
-            }
-          }
-          if (currentLine.trim()) {
-            lines.push(currentLine.trim());
-          }
-        } else {
-          lines.push(description);
-        }
-        
-        // Ensure at least one line
-        if (lines.length === 0) {
-          lines.push(description.substring(0, maxDescLength - 3) + '...');
-        }
-        
-        const reference = entry.reference.length > 8 ? entry.reference.substring(0, 6) + '...' : entry.reference;
-        const debitText = entry.debit > 0 ? formatCurrency(entry.debit).replace('₹', '') : '-';
-        const creditText = entry.credit > 0 ? formatCurrency(entry.credit).replace('₹', '') : '-';
-        const balanceText = formatCurrency(entry.balance).replace('₹', '');
-        
-        // Calculate row height based on number of description lines
-        const lineSpacing = 4.5; // Better line spacing
-        const minRowHeight = 8; // Minimum row height
-        const rowHeight = Math.max(minRowHeight, lines.length * lineSpacing + 6); // Add more padding for bottom clearance
-        
-        // Place text in columns with proper positioning
-        colX = tableStart;
-        const borderTop = runningY - 2; // For border drawing
-        
-        // Date column - centered
-        doc.text(date, colX + colWidths[0]/2, runningY + 2, { align: 'center' });
-        colX += colWidths[0];
-        
-        // Multi-line description with proper vertical spacing
-        lines.forEach((line, lineIndex) => {
-          doc.text(line, colX + 2, borderTop + 3 + (lineIndex * lineSpacing));
+      doc.line(30, 35, pageWidth - 30, 35);
+  
+      let y = 45;
+  
+      // ---------------- CUSTOMER INFO ----------------
+      doc.setFontSize(10).setFont("helvetica", "normal");
+      doc.text(`Customer: ${customer.name}`, margin, y); y += 6;
+      doc.text(`Phone: ${customer.phone || "N/A"}`, margin, y); y += 6;
+      doc.text(`Address: ${customer.address || "N/A"}`, margin, y); y += 6;
+      doc.text(
+        `Statement Period: ${startDate ? format(new Date(startDate), "dd/MM/yyyy") : "All"} - ${endDate ? format(new Date(endDate), "dd/MM/yyyy") : "Current"}`,
+        margin,
+        y
+      );
+      y += 15;
+  
+      // ---------------- TABLE HEADERS ----------------
+      doc.setFontSize(9).setFont("helvetica", "bold");
+  
+      const colWidths = [
+        tableWidth * 0.15, // Date
+        tableWidth * 0.25, // Description
+        tableWidth * 0.10, // Ref
+        tableWidth * 0.15, // Debit
+        tableWidth * 0.15, // Credit
+        tableWidth * 0.20, // Balance
+      ];
+  
+      const drawTableHeader = (yPos: number) => {
+        let colX = margin;
+        const headers = ["Date", "Description", "Ref", "Debit", "Credit", "Balance"];
+        headers.forEach((header, i) => {
+          const align = i === 1 ? "left" : "center";
+          const offset = i === 1 ? 2 : colWidths[i] / 2;
+          doc.text(header, colX + offset, yPos, { align });
+          colX += colWidths[i];
         });
-        
+  
+        doc.setLineWidth(0.5);
+        doc.rect(margin, yPos - 5, tableWidth, 8);
+  
+        colX = margin;
+        for (let i = 0; i < colWidths.length - 1; i++) {
+          colX += colWidths[i];
+          doc.line(colX, yPos - 5, colX, yPos + 3);
+        }
+      };
+  
+      drawTableHeader(y);
+      y += 2;
+  
+      // ---------------- TABLE ROWS ----------------
+      doc.setFont("helvetica", "normal");
+  
+      statement.forEach((entry) => {
+        const descLines = doc.splitTextToSize(entry.description, colWidths[1] - 4);
+        const rowHeight = Math.max(8, descLines.length * 5 + 4);
+  
+        if (y + rowHeight > pageHeight - 30) {
+          doc.addPage();
+          y = 20;
+          drawTableHeader(y);
+          y += 8;
+        }
+  
+        let colX = margin;
+        const date = format(new Date(entry.date), "dd/MM/yyyy");
+        const reference = entry.reference.length > 8 ? entry.reference.slice(0, 6) + "..." : entry.reference;
+        const debitText = entry.debit > 0 ? formatCurrency(entry.debit).replace("₹", "") : "-";
+        const creditText = entry.credit > 0 ? formatCurrency(entry.credit).replace("₹", "") : "-";
+        const balanceText = formatCurrency(entry.balance).replace("₹", "");
+  
+        // Date
+        doc.text(date, colX + colWidths[0] / 2, y + 4, { align: "center" });
+        colX += colWidths[0];
+  
+        // Description
+        descLines.forEach((line, i) => {
+          doc.text(line, colX + 2, y + 4 + i * 5);
+        });
         colX += colWidths[1];
-        doc.text(reference, colX + colWidths[2]/2, runningY + 2, { align: 'center' });
+  
+        // Ref
+        doc.text(reference, colX + colWidths[2] / 2, y + 4, { align: "center" });
         colX += colWidths[2];
-        
-        // Debit column (red)
+  
+        // Debit (red)
         doc.setTextColor(255, 0, 0);
-        doc.text(debitText, colX + colWidths[3]/2, runningY + 2, { align: 'center' });
+        doc.text(debitText, colX + colWidths[3] / 2, y + 4, { align: "center" });
         colX += colWidths[3];
-        
-        // Credit column (green)
+  
+        // Credit (green)
         doc.setTextColor(0, 128, 0);
-        doc.text(creditText, colX + colWidths[4]/2, runningY + 2, { align: 'center' });
+        doc.text(creditText, colX + colWidths[4] / 2, y + 4, { align: "center" });
         colX += colWidths[4];
-        
-        // Balance column (black, bold)
+  
+        // Balance (black bold)
         doc.setTextColor(0, 0, 0);
-        doc.setFont('helvetica', 'bold');
-        doc.text(balanceText, colX + colWidths[5]/2, runningY + 2, { align: 'center' });
-        doc.setFont('helvetica', 'normal');
-        
-        // Draw row border with proper positioning
-        doc.setTextColor(0, 0, 0); // Reset color
-        
-        // Draw cell borders for each column
-        colX = tableStart;
+        doc.setFont("helvetica", "bold");
+        doc.text(balanceText, colX + colWidths[5] / 2, y + 4, { align: "center" });
+  
+        // Reset font
+        doc.setFont("helvetica", "normal");
+  
+        // Draw row borders
+        colX = margin;
         for (let i = 0; i < colWidths.length; i++) {
-          // Draw cell
-          doc.rect(colX, borderTop, colWidths[i], rowHeight);
+          doc.rect(colX, y, colWidths[i], rowHeight);
           colX += colWidths[i];
         }
-        
-        // Draw horizontal separators for multi-line cells (optional - comment out for cleaner look)
-        // if (lines.length > 1) {
-        //   colX = tableStart + colWidths[0]; // Description column
-        //   for (let lineIndex = 1; lineIndex < lines.length; lineIndex++) {
-        //     const sepY = borderTop + (lineIndex * lineSpacing);
-        //     doc.line(colX + 2, sepY, colX + colWidths[1] - 2, sepY);
-        //   }
-        // }
-
-        runningY += rowHeight;
+  
+        y += rowHeight;
       });
-      
-      // Summary section
-      runningY += 10;
-      if (runningY > 240) {
+  
+      // ---------------- SUMMARY ----------------
+      if (y + 30 > pageHeight - 20) {
         doc.addPage();
-        runningY = 20;
+        y = 20;
       }
-      
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      doc.text('Account Summary', 20, runningY);
-      runningY += 15;
-      
-      // Draw summary background with gray like image
-      doc.setFillColor(249, 249, 249);
-      doc.rect(20, runningY - 5, 170, 20, 'F');
-      
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      doc.text(`Total Outstanding Balance: ${formatCurrency(calculateTotalOutstanding()).replace('₹', '')}`, 25, runningY);
-      runningY += 6;
-      doc.text(`Total Transactions: ${statement.length}`, 25, runningY);
-      
-      // MOBILE-FRIENDLY DOWNLOAD
-      const pdfName = `customer-statement-${customer.name.replace(/\s+/g, '-').toLowerCase()}-${format(new Date(), 'yyyy-MM-dd')}.pdf`;
-      const pdfBlob = doc.output('blob');
-      
-      await PDFDownloader.downloadPDF(pdfBlob, pdfName);
-      
-      toast({
-        title: 'PDF Downloaded',
-        description: 'Customer statement has been downloaded as PDF.',
-      });
 
+      // Add top margin/padding before Account Summary
+      y += 20;
+
+      doc.setFontSize(12).setFont("helvetica", "bold");
+      doc.text("Account Summary", margin, y); 
+      y += 15;
+  
+      doc.setFillColor(249, 249, 249);
+      doc.rect(margin, y - 5, tableWidth, 20, "F");
+  
+      doc.setFontSize(10).setFont("helvetica", "normal");
+      doc.text(`Total Outstanding Balance: ${formatCurrency(calculateTotalOutstanding()).replace("₹", "")}`, margin + 5, y);
+      y += 6;
+      doc.text(`Total Transactions: ${statement.length}`, margin + 5, y);
+  
+      // ---------------- FOOTER ---------------- 
+      const pageCount = doc.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.text(`Page ${i} of ${pageCount}`, pageWidth - margin, pageHeight - 10, { align: "right" });
+      }
+  
+      // ---------------- SAVE ----------------
+      const pdfName = `customer-statement-${customer.name.replace(/\s+/g, "-").toLowerCase()}-${format(new Date(), "yyyy-MM-dd")}.pdf`;
+      const pdfBlob = doc.output("blob");
+      saveAs(pdfBlob, pdfName);
+  
+      toast({
+        title: "PDF Downloaded",
+        description: "Customer statement has been downloaded as PDF.",
+      });
+  
     } catch (error) {
-      console.error('Error generating PDF:', error);
+      console.error("Error generating PDF:", error);
       toast({
         variant: "destructive",
         title: "Error",
@@ -497,7 +418,7 @@ const CustomerStatement: React.FC<CustomerStatementProps> = ({ customer }) => {
               <FileText className="h-5 w-5" />
               <CardTitle>Customer Statement</CardTitle>
             </div>
-            <Button onClick={exportToPDF} variant="outline" size="sm">
+            <Button onClick={(e) => { e.preventDefault(); exportToPDF(); }} variant="outline" size="sm">
               <Download className="h-4 w-4 mr-2" />
               Export PDF
             </Button>
