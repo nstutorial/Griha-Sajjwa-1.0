@@ -34,6 +34,7 @@ interface Loan {
   principal_amount: number;
   interest_rate: number;
   interest_type: 'daily' | 'monthly' | 'none';
+  emi_amount?: number;
   loan_date: string;
   due_date?: string;
   description?: string;
@@ -49,6 +50,7 @@ interface LoanTransaction {
   loan_id: string;
   amount: number;
   transaction_type: 'principal' | 'interest' | 'mixed';
+  payment_mode: 'cash' | 'bank';
   payment_date: string;
   notes?: string;
 }
@@ -75,6 +77,7 @@ const LoansList: React.FC<LoansListProps> = ({ onUpdate, status = 'active' }) =>
     amount: '',
     type: 'mixed' as 'principal' | 'interest' | 'mixed',
     notes: '',
+    payment_mode: 'cash' as 'cash' | 'bank',
   });
 
   useEffect(() => {
@@ -82,6 +85,15 @@ const LoansList: React.FC<LoansListProps> = ({ onUpdate, status = 'active' }) =>
       fetchLoans();
     }
   }, [user]);
+
+  useEffect(() => {
+    const handleRefresh = () => {
+      fetchLoans();
+    };
+
+    window.addEventListener('refresh-loans', handleRefresh);
+    return () => window.removeEventListener('refresh-loans', handleRefresh);
+  }, []);
 
   const fetchLoans = async () => {
     try {
@@ -93,6 +105,7 @@ const LoansList: React.FC<LoansListProps> = ({ onUpdate, status = 'active' }) =>
           principal_amount,
           interest_rate,
           interest_type,
+          emi_amount,
           loan_date,
           due_date,
           description,
@@ -184,6 +197,7 @@ const LoansList: React.FC<LoansListProps> = ({ onUpdate, status = 'active' }) =>
           loan_id: selectedLoan.id,
           amount: parseFloat(paymentData.amount),
           transaction_type: paymentData.type,
+          payment_mode: paymentData.payment_mode,
           notes: paymentData.notes || null,
         });
 
@@ -194,7 +208,7 @@ const LoansList: React.FC<LoansListProps> = ({ onUpdate, status = 'active' }) =>
         description: "The payment has been successfully recorded.",
       });
 
-      setPaymentData({ amount: '', type: 'mixed', notes: '' });
+      setPaymentData({ amount: '', type: 'mixed', notes: '', payment_mode: 'cash' });
       setShowPaymentDialog(false);
       await fetchLoans();
       await fetchTransactions(selectedLoan.id);
@@ -577,6 +591,7 @@ Generated on: ${new Date().toLocaleDateString()}
         const outstanding = balance + interest;
         const totalAmount = loan.principal_amount + interest;
         const isClosed = outstanding <= 0;
+        const totalPaid = loan.principal_amount - balance;
         
         return (
           <Card key={loan.id} className={`${isClosed ? 'opacity-60' : ''}`}>
@@ -605,7 +620,7 @@ Generated on: ${new Date().toLocaleDateString()}
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-7 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Principal</p>
                   <p className="font-semibold">₹{loan.principal_amount.toFixed(2)}</p>
@@ -617,6 +632,16 @@ Generated on: ${new Date().toLocaleDateString()}
                 <div>
                   <p className="text-sm text-muted-foreground">Total Amount</p>
                   <p className="font-semibold text-primary">₹{totalAmount.toFixed(2)}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">EMI Amount</p>
+                  <p className="font-semibold text-purple-600">
+                    {loan.emi_amount ? `₹${loan.emi_amount.toFixed(2)}` : 'N/A'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Collected Amount</p>
+                  <p className="font-semibold text-green-600">₹{totalPaid.toFixed(2)}</p>
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Outstanding Balance</p>
@@ -633,10 +658,12 @@ Generated on: ${new Date().toLocaleDateString()}
               <div className="flex space-x-2 flex-wrap">
                 {!isClosed && (
                   <>
-                    <Button size="sm" onClick={() => showPayment(loan)}>
-                      <Plus className="h-4 w-4 mr-1" />
-                      Add Payment
-                    </Button>
+                    {controlSettings.allowAddPayment && (
+                      <Button size="sm" onClick={() => showPayment(loan)}>
+                        <Plus className="h-4 w-4 mr-1" />
+                        Add Payment
+                      </Button>
+                    )}
                     <Button variant="outline" size="sm" onClick={() => showLedger(loan)}>
                       <Eye className="h-4 w-4 mr-1" />
                       View Ledger
@@ -655,12 +682,12 @@ Generated on: ${new Date().toLocaleDateString()}
                     </Button>
                   </div>
                 )}
-                {controlSettings.allowEdit && (
+                {controlSettings.allowEdit && !isClosed && (
                   <Button variant="outline" size="sm" onClick={() => handleEditLoan(loan)}>
                     <Edit className="h-4 w-4" />
                   </Button>
                 )}
-                {controlSettings.allowDelete && (
+                {controlSettings.allowDelete && !isClosed && (
                   <Button variant="destructive" size="sm" onClick={() => handleQuickDelete(loan)}>
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -709,6 +736,22 @@ Generated on: ${new Date().toLocaleDateString()}
             </div>
 
             <div className="space-y-2">
+              <Label>Payment Mode</Label>
+              <Select 
+                value={paymentData.payment_mode} 
+                onValueChange={(value: any) => setPaymentData({ ...paymentData, payment_mode: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="bank">Bank Transfer</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="payment-notes">Notes (Optional)</Label>
               <Input
                 id="payment-notes"
@@ -718,9 +761,11 @@ Generated on: ${new Date().toLocaleDateString()}
               />
             </div>
 
-            <Button type="submit" className="w-full">
-              Record Payment
-            </Button>
+            {controlSettings.allowRecordPayment && (
+              <Button type="submit" className="w-full">
+                Record Payment
+              </Button>
+            )}
           </form>
         </DialogContent>
       </Dialog>
@@ -759,6 +804,7 @@ Generated on: ${new Date().toLocaleDateString()}
                       <p className="font-medium">₹{transaction.amount.toFixed(2)}</p>
                       <div className="flex items-center space-x-2">
                         <Badge variant="outline">{transaction.transaction_type}</Badge>
+                        <Badge variant="secondary">{transaction.payment_mode}</Badge>
                         <span className="text-sm text-muted-foreground">
                           {new Date(transaction.payment_date).toLocaleDateString()}
                         </span>

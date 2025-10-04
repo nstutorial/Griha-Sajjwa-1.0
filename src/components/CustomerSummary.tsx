@@ -5,9 +5,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useToast } from '@/hooks/use-toast';
-import { Calendar, Download, Filter } from 'lucide-react';
+import { Calendar, Download, Filter, RefreshCw } from 'lucide-react';
 
 interface CustomerSummaryData {
   customer_id: string;
@@ -29,7 +36,9 @@ const CustomerSummary: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [loanStatusFilter, setLoanStatusFilter] = useState<'all' | 'active' | 'closed'>('all');
   const [summaryData, setSummaryData] = useState<CustomerSummaryData[]>([]);
+  const [cache, setCache] = useState<Map<string, CustomerSummaryData[]>>(new Map());
 
   useEffect(() => {
     if (user) {
@@ -45,133 +54,127 @@ const CustomerSummary: React.FC = () => {
     }
   }, [user]);
 
-  const fetchSummaryData = async (fromDate?: string, toDate?: string) => {
+  const fetchSummaryData = async (fromDate?: string, toDate?: string, statusFilter?: 'all' | 'active' | 'closed') => {
     if (!user) return;
+
+    const startDate = fromDate || dateFrom;
+    const endDate = toDate || dateTo;
+    const filter = statusFilter || loanStatusFilter;
+
+    // Create cache key
+    const cacheKey = `${startDate}-${endDate}-${filter}`;
+    
+    // Check cache first
+    if (cache.has(cacheKey)) {
+      setSummaryData(cache.get(cacheKey)!);
+      setLoading(false);
+      return;
+    }
 
     setLoading(true);
     try {
-      const startDate = fromDate || dateFrom;
-      const endDate = toDate || dateTo;
 
-      // Fetch all customers
-      const { data: customers, error: customersError } = await supabase
+      // Single optimized query with joins and aggregation
+      let query = supabase
         .from('customers')
-        .select('id, name, phone')
+        .select(`
+          id,
+          name,
+          phone,
+          loans!inner(
+            id,
+            principal_amount,
+            is_active,
+            loan_transactions(
+              id,
+              amount,
+              payment_date
+            )
+          )
+        `)
         .eq('user_id', user.id);
 
-      if (customersError) throw customersError;
+      // Apply loan status filter
+      if (filter === 'active') {
+        query = query.eq('loans.is_active', true);
+      } else if (filter === 'closed') {
+        query = query.eq('loans.is_active', false);
+      }
 
-      // Fetch loan data within date range
-      const { data: loans, error: loansError } = await supabase
-        .from('loans')
-        .select(`
-          id,
-          customer_id,
-          principal_amount,
-          loan_date,
-          is_active,
-          customers!inner(id, name, phone)
-        `)
-        .eq('user_id', user.id)
-        .gte('loan_date', `${startDate}T00:00:00.000Z`)
-        .lte('loan_date', `${endDate}T23:59:59.999Z`);
+      const { data: customersData, error } = await query;
 
-      if (loansError) throw loansError;
+      if (error) throw error;
 
-      // Fetch loan transactions within date range
-      const loanIds = loans?.map(loan => loan.id) || [];
-      const { data: transactions, error: transactionsError } = await supabase
-        .from('loan_transactions')
-        .select(`
-          id,
-          loan_id,
-          amount,
-          payment_date,
-          loan:loans!inner(customer_id)
-        `)
-        .in('loan_id', loanIds)
-        .gte('payment_date', `${startDate}T00:00:00.000Z`)
-        .lte('payment_date', `${endDate}T23:59:59.999Z`);
+      // Process data efficiently
+      const summaryData: CustomerSummaryData[] = (customersData || [])
+        .map(customer => {
+          const customerLoans = customer.loans || [];
+          
+          // Filter transactions by date range
+          const transactionsInRange = customerLoans.flatMap(loan => 
+            (loan.loan_transactions || []).filter(transaction => {
+              const paymentDate = new Date(transaction.payment_date);
+              return paymentDate >= new Date(startDate) && paymentDate <= new Date(endDate);
+            })
+          );
 
-      if (transactionsError) throw transactionsError;
+          // Calculate totals
+          const totalLoans = customerLoans.length;
+          const activeLoans = customerLoans.filter(loan => loan.is_active).length;
+          const totalLoanedAmount = customerLoans.reduce((sum, loan) => sum + loan.principal_amount, 0);
+          
+          const totalPaidAmount = transactionsInRange.reduce((sum, transaction) => sum + transaction.amount, 0);
+          const paymentFrequency = transactionsInRange.length;
+          
+          // Calculate outstanding balance (all payments, not just date range)
+          const allTransactions = customerLoans.flatMap(loan => loan.loan_transactions || []);
+          const totalPaidAllTime = allTransactions.reduce((sum, transaction) => sum + transaction.amount, 0);
+          const outstandingBalance = Math.max(0, totalLoanedAmount - totalPaidAllTime);
+          
+          // Find last payment date
+          const lastPaymentDate = transactionsInRange.length > 0 
+            ? transactionsInRange.reduce((latest, transaction) => 
+                new Date(transaction.payment_date) > new Date(latest.payment_date) ? transaction : latest
+              ).payment_date
+            : undefined;
 
-      // Process data to create summary
-      const summaryMap = new Map<string, CustomerSummaryData>();
+          const avgPaymentAmount = paymentFrequency > 0 ? totalPaidAmount / paymentFrequency : 0;
 
-      // Initialize customer entries
-      customers?.forEach(customer => {
-        summaryMap.set(customer.id, {
-          customer_id: customer.id,
-          customer_name: customer.name,
-          customer_phone: customer.phone || undefined,
-          total_loans: 0,
-          active_loans: 0,
-          total_loaned_amount: 0,
-          total_paid_amount: 0,
-          outstanding_balance: 0,
-          last_payment_date: undefined,
-          avg_payment_amount: 0,
-          payment_frequency: 0,
-        });
+          // Only include customers with loans matching the filter
+          if (totalLoans === 0) return null;
+
+          return {
+            customer_id: customer.id,
+            customer_name: customer.name,
+            customer_phone: customer.phone || undefined,
+            total_loans: totalLoans,
+            active_loans: activeLoans,
+            total_loaned_amount: totalLoanedAmount,
+            total_paid_amount: totalPaidAmount,
+            outstanding_balance: outstandingBalance,
+            last_payment_date: lastPaymentDate,
+            avg_payment_amount: avgPaymentAmount,
+            payment_frequency: paymentFrequency,
+          };
+        })
+        .filter(Boolean) as CustomerSummaryData[];
+
+      // Sort the filtered data
+      summaryData.sort((a, b) => b.outstanding_balance - a.outstanding_balance);
+
+      // Cache the results
+      setCache(prevCache => {
+        const newCache = new Map(prevCache);
+        newCache.set(cacheKey, summaryData);
+        // Limit cache size to 10 entries
+        if (newCache.size > 10) {
+          const firstKey = newCache.keys().next().value;
+          newCache.delete(firstKey);
+        }
+        return newCache;
       });
 
-      // Process loan transactions
-      transactions?.forEach((transaction) => {
-        const loanId = transaction.loan_id;
-        const loan = loans?.find(loan => loan.id === loanId);
-        if (!loan) return;
-
-        const customerId = loan.customer_id;
-        const summary = summaryMap.get(customerId);
-        if (!summary) return;
-
-        summary.total_paid_amount += transaction.amount;
-        summary.payment_frequency += 1;
-        
-        const paymentDate = new Date(transaction.payment_date);
-        if (!summary.last_payment_date || paymentDate > new Date(summary.last_payment_date)) {
-          summary.last_payment_date = transaction.payment_date;
-        }
-      });      
-
-      // Process loans
-      loans?.forEach((loan) => {
-        const customerId = loan.customer_id;
-        const summary = summaryMap.get(customerId);
-        if (!summary) return;
-
-        summary.total_loans += 1;
-        summary.total_loaned_amount += loan.principal_amount;
-        if (loan.is_active) {
-          summary.active_loans += 1;
-        }
-
-        // Calculate outstanding balance (simplified - principal - payments)
-        const loanTransactions = transactions?.filter(t => t.loan_id === loan.id) || [];
-        const totalPaid = loanTransactions.reduce((sum, t) => sum + t.amount, 0);
-        summary.outstanding_balance += Math.max(0, loan.principal_amount - totalPaid);
-      });
-
-      // Calculate averages and finalize data
-      const finalSummary: CustomerSummaryData[] = Array.from(summaryMap.values()).map(summary => {
-        summary.avg_payment_amount = summary.payment_frequency > 0 
-          ? summary.total_paid_amount / summary.payment_frequency 
-          : 0;
-        
-        // Only include customers with activity in the date range
-        if (summary.total_loans > 0 || summary.total_paid_amount > 0) {
-          return summary;
-        }
-        return null;
-      }).filter(Boolean) as CustomerSummaryData[];
-
-      // Filter customers who have loans in the selected date range
-      const customersWithLoans = loans?.map(loan => loan.customer_id) || [];
-      const finalSummaryFiltered = finalSummary
-        .filter(summary => customersWithLoans.includes(summary.customer_id))
-        .sort((a, b) => b.outstanding_balance - a.outstanding_balance);
-
-      setSummaryData(finalSummaryFiltered);
+      setSummaryData(summaryData);
     } catch (error) {
       console.error('Error fetching summary data:', error);
       toast({
@@ -185,7 +188,18 @@ const CustomerSummary: React.FC = () => {
   };
 
   const handleFilter = () => {
-    fetchSummaryData(dateFrom, dateTo);
+    fetchSummaryData(dateFrom, dateTo, loanStatusFilter);
+  };
+
+  const handleRefresh = () => {
+    // Clear cache to force fresh data
+    setCache(new Map());
+    fetchSummaryData(dateFrom, dateTo, loanStatusFilter);
+  };
+
+  const handleStatusFilterChange = (value: 'all' | 'active' | 'closed') => {
+    setLoanStatusFilter(value);
+    fetchSummaryData(dateFrom, dateTo, value);
   };
 
   const exportToCSV = () => {
@@ -269,36 +283,61 @@ const CustomerSummary: React.FC = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Calendar className="h-5 w-5" />
-            Date Range Filter
+            Filter Options
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center gap-4 mb-4">
-            <div className="space-y-1">
-              <label className="text-sm font-medium">From Date</label>
-              <Input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-              />
+          <div className="flex flex-col lg:flex-row items-start lg:items-center gap-4 mb-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+              <div className="space-y-1">
+                <label className="text-sm font-medium">From Date</label>
+                <Input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium">To Date</label>
+                <Input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-sm font-medium">Loan Status</label>
+                <Select value={loanStatusFilter} onValueChange={handleStatusFilterChange}>
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Loans</SelectItem>
+                    <SelectItem value="active">Active Only</SelectItem>
+                    <SelectItem value="closed">Closed Only</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <div className="space-y-1">
-              <label className="text-sm font-medium">To Date</label>
-              <Input
-                type="date"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-              />
-            </div>
-            <div className="flex items-end">
+            <div className="flex items-end gap-2">
               <Button onClick={handleFilter} className="flex items-center gap-2">
                 <Filter className="h-4 w-4" />
                 Filter
               </Button>
+              <Button 
+                onClick={handleRefresh} 
+                variant="outline" 
+                size="sm"
+                className="flex items-center gap-2"
+                disabled={loading}
+              >
+                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
             </div>
           </div>
           <p className="text-sm text-muted-foreground">
-            Showing loans and payments from {new Date(dateFrom).toLocaleDateString()} to {new Date(dateTo).toLocaleDateString()}
+            Showing {loanStatusFilter === 'all' ? 'all' : loanStatusFilter} loans with payment activity from {new Date(dateFrom).toLocaleDateString()} to {new Date(dateTo).toLocaleDateString()}
           </p>
         </CardContent>
       </Card>

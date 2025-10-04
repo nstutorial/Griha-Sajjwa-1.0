@@ -21,6 +21,7 @@ interface Customer {
     id: string;
     principal_amount: number;
     is_active: boolean;
+    emi_amount?: number;
   }>;
 }
 
@@ -63,7 +64,7 @@ const CustomersList = ({ onUpdate }: CustomersListProps) => {
         .from('customers')
         .select(`
           *,
-          loans (id, principal_amount, is_active, interest_rate, interest_type, loan_date)
+          loans (id, principal_amount, is_active, interest_rate, interest_type, loan_date, emi_amount)
         `)
         .eq('user_id', user?.id)
         .order('created_at', { ascending: false });
@@ -192,6 +193,30 @@ const CustomersList = ({ onUpdate }: CustomersListProps) => {
     }, 0);
   };
 
+  const calculateCustomerCollected = (customer: Customer) => {
+    const customerLoans = customer.loans || [];
+    return customerLoans.reduce((sum, loan) => {
+      const loanTransactions = allTransactions.filter(t => t.loan_id === loan.id);
+      const totalPaid = loanTransactions.reduce((transactionSum, t) => transactionSum + t.amount, 0);
+      return sum + totalPaid;
+    }, 0);
+  };
+
+  const calculateCustomerEMIsPaid = (customer: Customer) => {
+    const customerLoans = customer.loans || [];
+    return customerLoans.reduce((sum, loan) => {
+      const loanTransactions = allTransactions.filter(t => t.loan_id === loan.id);
+      return sum + loanTransactions.length;
+    }, 0);
+  };
+
+  const calculateCustomerEMIAmount = (customer: Customer) => {
+    const activeLoans = customer.loans?.filter(loan => loan.is_active) || [];
+    return activeLoans.reduce((sum, loan) => {
+      return sum + (loan.emi_amount || 0);
+    }, 0);
+  };
+
   const filteredCustomers = customers.filter(customer => {
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
@@ -241,6 +266,9 @@ const CustomersList = ({ onUpdate }: CustomersListProps) => {
         const activeLoans = customer.loans?.filter(loan => loan.is_active) || [];
         const totalLoaned = customer.loans?.reduce((sum, loan) => sum + Number(loan.principal_amount), 0) || 0;
         const outstandingBalance = calculateCustomerOutstanding(customer);
+        const collectedAmount = calculateCustomerCollected(customer);
+        const emisPaid = calculateCustomerEMIsPaid(customer);
+        const emiAmount = calculateCustomerEMIAmount(customer);
         const customerId = customer.phone || 'N/A';
         
         return (
@@ -249,12 +277,7 @@ const CustomersList = ({ onUpdate }: CustomersListProps) => {
               <div className="flex items-center justify-between">
                 <div>
                   <div className="flex items-center gap-2">
-                    <CardTitle className="text-lg">{customer.name}</CardTitle>
-                    {customer.phone && (
-                      <Badge variant="outline" className="text-xs">
-                        {customer.phone}
-                      </Badge>
-                    )}
+                    <CardTitle className="text-lg">{customer.name}</CardTitle>                   
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">Customer ID: {customerId}</p>
                 </div>
@@ -312,10 +335,22 @@ const CustomersList = ({ onUpdate }: CustomersListProps) => {
 
               {totalLoaned > 0 && (
                 <div className="p-3 bg-muted rounded-lg">
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-6 gap-4">
                     <div>
                       <p className="text-sm text-muted-foreground">Total Loaned</p>
                       <p className="font-semibold">₹{totalLoaned.toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">Collected Amount</p>
+                      <p className="font-semibold text-green-600">₹{collectedAmount.toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">EMI Amount</p>
+                      <p className="font-semibold text-purple-600">₹{emiAmount.toFixed(2)}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-muted-foreground">EMIs Paid</p>
+                      <p className="font-semibold text-blue-600">{emisPaid}</p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Active Loans</p>

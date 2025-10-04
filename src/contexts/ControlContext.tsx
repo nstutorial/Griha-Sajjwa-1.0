@@ -9,6 +9,9 @@ export interface ControlSettings {
   allowExport: boolean;
   showFinancialTotals: boolean;
   allowBulkOperations: boolean;
+  allowAddPayment: boolean;
+  allowPaymentManager: boolean;
+  allowRecordPayment: boolean;
 }
 
 interface ControlContextType {
@@ -28,6 +31,9 @@ export const ControlProvider: React.FC<{ children: React.ReactNode }> = ({ child
     allowExport: true,
     showFinancialTotals: true,
     allowBulkOperations: true,
+    allowAddPayment: true,
+    allowPaymentManager: true,
+    allowRecordPayment: true,
   });
   const [loading, setLoading] = useState(false);
 
@@ -40,6 +46,9 @@ export const ControlProvider: React.FC<{ children: React.ReactNode }> = ({ child
         allowExport: true,
         showFinancialTotals: true,
         allowBulkOperations: true,
+        allowAddPayment: true,
+        allowPaymentManager: true,
+        allowRecordPayment: true,
       });
       return;
     }
@@ -65,12 +74,31 @@ export const ControlProvider: React.FC<{ children: React.ReactNode }> = ({ child
             allowExport: true,
             showFinancialTotals: true,
             allowBulkOperations: true,
+            allowAddPayment: true,
+            allowPaymentManager: true,
+            allowRecordPayment: true,
           });
         } else {
           throw error;
         }
       } else if (data && 'control_settings' in data) {
-        setSettings((data as any).control_settings);
+        // Merge database settings with defaults to ensure all fields are present
+        const defaultSettings = {
+          allowEdit: true,
+          allowDelete: true,
+          allowAddNew: true,
+          allowExport: true,
+          showFinancialTotals: true,
+          allowBulkOperations: true,
+          allowAddPayment: true,
+          allowPaymentManager: true,
+          allowRecordPayment: true,
+        };
+        const dbSettings = (data as any).control_settings;
+        setSettings({
+          ...defaultSettings,
+          ...dbSettings
+        });
       } else {
         // No data found - use defaults
         setSettings({
@@ -80,6 +108,9 @@ export const ControlProvider: React.FC<{ children: React.ReactNode }> = ({ child
           allowExport: true,
           showFinancialTotals: true,
           allowBulkOperations: true,
+          allowAddPayment: true,
+          allowPaymentManager: true,
+          allowRecordPayment: true,
         });
       }
       
@@ -92,6 +123,9 @@ export const ControlProvider: React.FC<{ children: React.ReactNode }> = ({ child
         allowExport: true,
         showFinancialTotals: true,
         allowBulkOperations: true,
+        allowAddPayment: true,
+        allowPaymentManager: true,
+        allowRecordPayment: true,
       });
     } finally {
       setLoading(false);

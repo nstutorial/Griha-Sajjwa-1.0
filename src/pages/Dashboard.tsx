@@ -12,11 +12,8 @@ import {
   TrendingUp, 
   Users, 
   DollarSign,
-  LogOut,
-  ShoppingCart
+  LogOut
 } from 'lucide-react';
-import ExpensesListEnhanced from '@/components/ExpensesListEnhanced';
-import AddExpenseDialog from '@/components/AddExpenseDialog';
 import LoansList from '@/components/LoansList';
 import AddLoanDialog from '@/components/AddLoanDialog';
 import CustomersList from '@/components/CustomersList';
@@ -25,36 +22,31 @@ import CustomerSummary from '@/components/CustomerSummary';
 import DaywiseCustomerManager from '@/components/DaywiseCustomerManager';
 import DaywisePayment from '@/components/DaywisePayment';
 import DateWisePayments from '@/components/DateWisePayments';
-import SalesList from '@/components/SalesList';
-import AddSaleDialog from '@/components/AddSaleDialog';
-import SaleCustomersList from '@/components/SaleCustomersList';
 import { TabSettings } from '@/pages/Settings';
 import { useToast } from '@/hooks/use-toast';
 import LoadingSpinner from '@/components/LoadingSpinner';
+import { useControl } from '@/contexts/ControlContext';
 
 interface DashboardStats {
-  totalExpenses: number;
-  totalLoaned: number;
-  totalReceived: number;
   activeLoans: number;
+  todaysCollection: number;
+  thisMonthDisbursed: number;
 }
 
 const Dashboard = () => {
   const { user, signOut, loading } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { settings: controlSettings } = useControl();
   const [stats, setStats] = useState<DashboardStats>({
-    totalExpenses: 0,
-    totalLoaned: 0,
-    totalReceived: 0,
     activeLoans: 0,
+    todaysCollection: 0,
+    thisMonthDisbursed: 0,
   });
-  const [activeTab, setActiveTab] = useState('expenses');
+  const [activeTab, setActiveTab] = useState('loans');
   const [tabSettings, setTabSettings] = useState<TabSettings>({
-    expenses: true,
     loans: true,
     customers: true,
-    sales: true,
     daywise: true,
     payments: true,
   });
@@ -80,10 +72,8 @@ const Dashboard = () => {
       } else {
         // If no settings exist, create default settings
         const defaultSettings = {
-          expenses: true,
           loans: true,
           customers: true,
-          sales: true,
           daywise: true,
           payments: true,
         };
@@ -110,36 +100,44 @@ const Dashboard = () => {
     if (!user) return;
 
     try {
-      // Get total expenses
-      const { data: expenses } = await supabase
-        .from('expenses')
-        .select('amount')
-        .eq('user_id', user.id);
-      
-      const totalExpenses = expenses?.reduce((sum, exp) => sum + Number(exp.amount), 0) || 0;
-
       // Get loans data
       const { data: loans } = await supabase
         .from('loans')
-        .select('principal_amount, is_active')
+        .select('is_active')
         .eq('user_id', user.id);
       
-      const totalLoaned = loans?.reduce((sum, loan) => sum + Number(loan.principal_amount), 0) || 0;
       const activeLoans = loans?.filter(loan => loan.is_active).length || 0;
 
-      // Get total received from loan transactions
-      const { data: transactions } = await supabase
+
+      // Get today's collection
+      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+      const { data: todaysTransactions } = await supabase
         .from('loan_transactions')
         .select('amount, loans!inner(user_id)')
-        .eq('loans.user_id', user.id);
+        .eq('loans.user_id', user.id)
+        .gte('created_at', `${today}T00:00:00.000Z`)
+        .lt('created_at', `${today}T23:59:59.999Z`);
       
-      const totalReceived = transactions?.reduce((sum, trans) => sum + Number(trans.amount), 0) || 0;
+      const todaysCollection = todaysTransactions?.reduce((sum, trans) => sum + Number(trans.amount), 0) || 0;
+
+      // Get this month's loan disbursed
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999).toISOString();
+      
+      const { data: thisMonthLoans } = await supabase
+        .from('loans')
+        .select('principal_amount')
+        .eq('user_id', user.id)
+        .gte('created_at', startOfMonth)
+        .lte('created_at', endOfMonth);
+      
+      const thisMonthDisbursed = thisMonthLoans?.reduce((sum, loan) => sum + Number(loan.principal_amount), 0) || 0;
 
       setStats({
-        totalExpenses,
-        totalLoaned,
-        totalReceived,
         activeLoans,
+        todaysCollection,
+        thisMonthDisbursed,
       });
     } catch (error) {
       console.error('Error fetching stats:', error);
@@ -199,7 +197,7 @@ const Dashboard = () => {
                 <div className="flex items-center space-x-2 sm:space-x-3">
                   <SidebarTrigger />
                   <Wallet className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
-                  <h1 className="text-lg sm:text-xl md:text-2xl font-bold truncate">MoneyTracker Pro</h1>
+                  <h1 className="text-lg sm:text-xl md:text-2xl font-bold truncate">Griha Sajjwa 1.0</h1>
                 </div>
                 <Button variant="outline" onClick={handleSignOut} className="text-xs sm:text-sm">
                   <LogOut className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
@@ -212,39 +210,27 @@ const Dashboard = () => {
 
       <div className="w-full px-4 py-6">
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-6">
           <Card className="p-3 sm:p-4">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-0">
-              <CardTitle className="text-xs sm:text-sm font-medium truncate">Total Expenses</CardTitle>
-              <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-destructive flex-shrink-0" />
+              <CardTitle className="text-xs sm:text-sm font-medium truncate">Today's Collection</CardTitle>
+              <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 text-purple-600 flex-shrink-0" />
             </CardHeader>
             <CardContent className="p-0 pt-2">
-              <div className="text-lg sm:text-xl lg:text-2xl font-bold text-destructive truncate">
-                ₹{stats.totalExpenses.toFixed(2)}
+              <div className="text-lg sm:text-xl lg:text-2xl font-bold text-purple-600 truncate">
+                ₹{stats.todaysCollection.toFixed(2)}
               </div>
             </CardContent>
           </Card>
 
           <Card className="p-3 sm:p-4">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-0">
-              <CardTitle className="text-xs sm:text-sm font-medium truncate">Total Loaned</CardTitle>
-              <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 text-orange-600 flex-shrink-0" />
+              <CardTitle className="text-xs sm:text-sm font-medium truncate">This Month Disbursed</CardTitle>
+              <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-indigo-600 flex-shrink-0" />
             </CardHeader>
             <CardContent className="p-0 pt-2">
-              <div className="text-lg sm:text-xl lg:text-2xl font-bold text-orange-600 truncate">
-                ₹{stats.totalLoaned.toFixed(2)}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="p-3 sm:p-4">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-0">
-              <CardTitle className="text-xs sm:text-sm font-medium truncate">Total Received</CardTitle>
-              <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-green-600 flex-shrink-0" />
-            </CardHeader>
-            <CardContent className="p-0 pt-2">
-              <div className="text-lg sm:text-xl lg:text-2xl font-bold text-green-600 truncate">
-                ₹{stats.totalReceived.toFixed(2)}
+              <div className="text-lg sm:text-xl lg:text-2xl font-bold text-indigo-600 truncate">
+                ₹{stats.thisMonthDisbursed.toFixed(2)}
               </div>
             </CardContent>
           </Card>
@@ -264,43 +250,22 @@ const Dashboard = () => {
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <div className="overflow-x-auto">
               <TabsList className="grid w-full min-w-max" style={{ gridTemplateColumns: `repeat(${Object.values(tabSettings).filter(Boolean).length}, 1fr)` }}>
-                {tabSettings.expenses && <TabsTrigger value="expenses" className="text-xs sm:text-sm">Expenses</TabsTrigger>}
                 {tabSettings.loans && <TabsTrigger value="loans" className="text-xs sm:text-sm">Loans</TabsTrigger>}
                 {tabSettings.customers && <TabsTrigger value="customers" className="text-xs sm:text-sm">Customers</TabsTrigger>}
-                {tabSettings.sales && (
-                  <>
-                    <TabsTrigger value="sales" className="text-xs sm:text-sm">
-                      <ShoppingCart className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                      <span className="hidden sm:inline">Sales</span>
-                      <span className="sm:hidden">Sales</span>
-                    </TabsTrigger>
-                    <TabsTrigger value="sale-customers" className="text-xs sm:text-sm">
-                      <span className="hidden sm:inline">Sale Customers</span>
-                      <span className="sm:hidden">S. Customers</span>
-                    </TabsTrigger>
-                  </>
-                )}
                 {tabSettings.daywise && <TabsTrigger value="daywise" className="text-xs sm:text-sm">Daywise</TabsTrigger>}
                 {tabSettings.payments && <TabsTrigger value="payments" className="text-xs sm:text-sm">Payments</TabsTrigger>}
               </TabsList>
             </div>
-
-            {tabSettings.expenses && (
-              <TabsContent value="expenses" className="space-y-4 mt-4">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0">
-                  <h2 className="text-lg sm:text-xl font-semibold">Your Expenses & Earnings</h2>
-                  {/* <AddExpenseDialog onExpenseAdded={fetchStats} /> */}
-                </div>
-                <ExpensesListEnhanced />
-              </TabsContent>
-            )}
 
             {tabSettings.loans && (
               <TabsContent value="loans" className="space-y-4 mt-4">
                 <div className="space-y-4">
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0">
                     <h2 className="text-lg sm:text-xl font-semibold">Loans & Lending</h2>
-                    <AddLoanDialog onLoanAdded={fetchStats} />
+                    <AddLoanDialog onLoanAdded={() => {
+                      fetchStats();
+                      window.dispatchEvent(new CustomEvent('refresh-loans'));
+                    }} />
                   </div>
                   
                   {/* Sub-tabs for Loans */}
@@ -333,13 +298,15 @@ const Dashboard = () => {
                   
                   {/* Sub-tabs for Customers */}
                   <Tabs defaultValue="list" className="w-full">
-                    <TabsList className="grid grid-cols-3">
+                    <TabsList className={`grid ${controlSettings.allowPaymentManager ? 'grid-cols-3' : 'grid-cols-2'}`}>
                       <TabsTrigger value="list" className="text-xs sm:text-sm">Customer List</TabsTrigger>
                       <TabsTrigger value="summary" className="text-xs sm:text-sm">Summary Report</TabsTrigger>
-                      <TabsTrigger value="payment-manager" className="text-xs sm:text-sm">
-                        <span className="hidden sm:inline">Payment Manager</span>
-                        <span className="sm:hidden">Payments</span>
-                      </TabsTrigger>
+                      {controlSettings.allowPaymentManager && (
+                        <TabsTrigger value="payment-manager" className="text-xs sm:text-sm">
+                          <span className="hidden sm:inline">Payment Manager</span>
+                          <span className="sm:hidden">Payments</span>
+                        </TabsTrigger>
+                      )}
                     </TabsList>
                     <TabsContent value="list" className="mt-4">
                       <CustomersList onUpdate={fetchStats} />
@@ -347,31 +314,14 @@ const Dashboard = () => {
                     <TabsContent value="summary" className="mt-4">
                       <CustomerSummary />
                     </TabsContent>
-                    <TabsContent value="payment-manager" className="mt-4">
-                      <DaywiseCustomerManager />
-                    </TabsContent>
+                    {controlSettings.allowPaymentManager && (
+                      <TabsContent value="payment-manager" className="mt-4">
+                        <DaywiseCustomerManager />
+                      </TabsContent>
+                    )}
                   </Tabs>
                 </div>
               </TabsContent>
-            )}
-
-            {tabSettings.sales && (
-              <>
-                <TabsContent value="sales" className="space-y-4 mt-4">
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0">
-                    <h2 className="text-lg sm:text-xl font-semibold">Sales</h2>
-                    <AddSaleDialog onSaleAdded={fetchStats} />
-                  </div>
-                  <SalesList onUpdate={fetchStats} />
-                </TabsContent>
-
-                <TabsContent value="sale-customers" className="space-y-4 mt-4">
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0">
-                    <h2 className="text-lg sm:text-xl font-semibold">Sale Customers</h2>
-                  </div>
-                  <SaleCustomersList />
-                </TabsContent>
-              </>
             )}
 
             {tabSettings.daywise && (

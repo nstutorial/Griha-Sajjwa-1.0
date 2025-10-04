@@ -7,6 +7,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { ChevronDown, ChevronRight, Users, MapPin, Calendar, Phone } from 'lucide-react';
 
@@ -41,6 +48,8 @@ const DaywiseCustomerManager: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [dayGroups, setDayGroups] = useState<DayGroup[]>([]);
   const [paymentInputs, setPaymentInputs] = useState<Record<string, string>>({});
+  const [paymentModes, setPaymentModes] = useState<Record<string, 'cash' | 'bank'>>({});
+  const [paymentLoading, setPaymentLoading] = useState<Record<string, boolean>>({});
   const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set());
   const [expandedAddresses, setExpandedAddresses] = useState<Set<string>>(new Set());
 
@@ -200,6 +209,13 @@ const DaywiseCustomerManager: React.FC = () => {
     }));
   };
 
+  const handlePaymentModeChange = (customerId: string, mode: 'cash' | 'bank') => {
+    setPaymentModes(prev => ({
+      ...prev,
+      [customerId]: mode,
+    }));
+  };
+
   const handlePaymentSubmit = async (customer: Customer) => {
     const amountStr = paymentInputs[customer.id];
     if (!amountStr || parseFloat(amountStr) <= 0) {
@@ -211,8 +227,19 @@ const DaywiseCustomerManager: React.FC = () => {
       return;
     }
 
+    // Prevent double submission
+    if (paymentLoading[customer.id]) {
+      return;
+    }
+
     const amount = parseFloat(amountStr);
     console.log('Payment submission started:', { customer: customer.name, amount, loans: customer.loans });
+
+    // Set loading state
+    setPaymentLoading(prev => ({
+      ...prev,
+      [customer.id]: true,
+    }));
 
     try {
       // Create transactions for each active loan of this customer
@@ -228,16 +255,40 @@ const DaywiseCustomerManager: React.FC = () => {
         return;
       }
 
+      // Calculate total outstanding balance across all active loans
+      const totalOutstanding = customer.loans
+        .filter(loan => loan.is_active && loan.outstanding_balance && loan.outstanding_balance > 0)
+        .reduce((sum, loan) => sum + (loan.outstanding_balance || 0), 0);
+
+      console.log('Total outstanding:', totalOutstanding, 'Payment amount:', amount);
+
+      if (totalOutstanding === 0) {
+        toast({
+          variant: 'destructive',
+          title: 'No Outstanding Balance',
+          description: `No outstanding balance found for ${customer.name}`,
+        });
+        return;
+      }
+
+      let remainingAmount = amount;
+
       for (const loan of customer.loans) {
         console.log('Checking loan:', { loanId: loan.id, isActive: loan.is_active, outstandingBalance: loan.outstanding_balance });
         
-        if (loan.is_active && loan.outstanding_balance && loan.outstanding_balance > 0) {
+        if (loan.is_active && loan.outstanding_balance && loan.outstanding_balance > 0 && remainingAmount > 0) {
+          const paymentForThisLoan = Math.min(remainingAmount, loan.outstanding_balance);
+          
           transactions.push({
             loan_id: loan.id,
-            amount: loan.outstanding_balance > amount ? amount : loan.outstanding_balance, // Pay in full or partial
+            amount: paymentForThisLoan,
             transaction_type: 'principal',
+            payment_mode: paymentModes[customer.id] || 'cash',
             notes: `Payment received from ${customer.name}`,
           });
+
+          remainingAmount -= paymentForThisLoan;
+          console.log(`Payment ${paymentForThisLoan} for loan ${loan.id}, remaining: ${remainingAmount}`);
         }
       }
 
@@ -283,6 +334,12 @@ const DaywiseCustomerManager: React.FC = () => {
         title: 'Error',
         description: `Failed to record payment: ${error.message || 'Unknown error'}`,
       });
+    } finally {
+      // Clear loading state
+      setPaymentLoading(prev => ({
+        ...prev,
+        [customer.id]: false,
+      }));
     }
   };
 
@@ -442,8 +499,8 @@ const DaywiseCustomerManager: React.FC = () => {
 
                                           {/* Payment Input */}
                                           <div className="border-t pt-4">
-                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
-                                              <div className="md:col-span-2">
+                                            <div className="space-y-4">
+                                              <div>
                                                 <Label htmlFor={`payment-${customer.id}`}>
                                                   Record Payment for {customer.name}
                                                 </Label>
@@ -453,16 +510,39 @@ const DaywiseCustomerManager: React.FC = () => {
                                                   placeholder="Enter payment amount"
                                                   value={paymentInputs[customer.id] || ''}
                                                   onChange={(e) => handlePaymentInputChange(customer.id, e.target.value)}
+                                                  className="mt-1"
                                                 />
                                               </div>
+                                              
+                                              <div>
+                                                <Label htmlFor={`payment-mode-${customer.id}`}>
+                                                  Payment Mode
+                                                </Label>
+                                                <Select 
+                                                  value={paymentModes[customer.id] || 'cash'} 
+                                                  onValueChange={(value: 'cash' | 'bank') => 
+                                                    handlePaymentModeChange(customer.id, value)
+                                                  }
+                                                >
+                                                  <SelectTrigger className="mt-1">
+                                                    <SelectValue />
+                                                  </SelectTrigger>
+                                                  <SelectContent>
+                                                    <SelectItem value="cash">Cash</SelectItem>
+                                                    <SelectItem value="bank">Bank Transfer</SelectItem>
+                                                  </SelectContent>
+                                                </Select>
+                                              </div>
+
                                               <Button 
                                                 onClick={() => {
                                                   console.log('Payment button clicked for:', customer.name);
                                                   handlePaymentSubmit(customer);
                                                 }}
-                                                className="h-10"
+                                                disabled={paymentLoading[customer.id]}
+                                                className="w-full"
                                               >
-                                                Record Payment
+                                                {paymentLoading[customer.id] ? 'Recording...' : 'Record Payment'}
                                               </Button>
                                             </div>
                                           </div>

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -18,6 +19,7 @@ interface Customer {
     id: string;
     principal_amount: number;
     is_active: boolean;
+    emi_amount?: number;
   }>;
 }
 
@@ -28,6 +30,7 @@ interface DaywisePaymentProps {
 const DaywisePayment: React.FC<DaywisePaymentProps> = ({ onUpdate }) => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [allTransactions, setAllTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -77,7 +80,7 @@ const DaywisePayment: React.FC<DaywisePaymentProps> = ({ onUpdate }) => {
         .from('customers')
         .select(`
           *,
-          loans:loans(id, principal_amount, is_active, interest_rate, interest_type, loan_date)
+          loans:loans(id, principal_amount, is_active, interest_rate, interest_type, loan_date, emi_amount)
         `)
         .eq('user_id', user?.id)
         .order('name');
@@ -147,6 +150,13 @@ const DaywisePayment: React.FC<DaywisePaymentProps> = ({ onUpdate }) => {
     }, 0);
   };
 
+  const calculateCustomerEMIAmount = (customer: Customer) => {
+    const activeLoans = customer.loans?.filter(loan => loan.is_active) || [];
+    return activeLoans.reduce((sum, loan) => {
+      return sum + (loan.emi_amount || 0);
+    }, 0);
+  };
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
@@ -157,6 +167,11 @@ const DaywisePayment: React.FC<DaywisePaymentProps> = ({ onUpdate }) => {
   const getCustomersByDay = (day: string) => {
     return customers.filter(customer => customer.payment_day === day);
   };
+
+  const handleDayClick = (day: string) => {
+    navigate(`/collection?day=${day}`);
+  };
+
 
   const getCurrentDay = () => {
     const today = new Date();
@@ -206,6 +221,59 @@ const DaywisePayment: React.FC<DaywisePaymentProps> = ({ onUpdate }) => {
           Customers organized by their preferred payment days
         </p>
       </div>
+
+      {/* Payment Schedule Summary - Moved to top */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Payment Schedule Summary</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {daysOfWeek.map((day) => {
+              const dayCustomers = getCustomersByDay(day);
+              const totalOutstanding = dayCustomers.reduce((sum, customer) => {
+                return sum + calculateCustomerOutstanding(customer);
+              }, 0);
+              const totalEMIAmount = dayCustomers.reduce((sum, customer) => {
+                return sum + calculateCustomerEMIAmount(customer);
+              }, 0);
+              
+              const dayColors = {
+                sunday: 'bg-red-100 border-red-200',
+                monday: 'bg-blue-100 border-blue-200',
+                tuesday: 'bg-green-100 border-green-200',
+                wednesday: 'bg-yellow-100 border-yellow-200',
+                thursday: 'bg-purple-100 border-purple-200',
+                friday: 'bg-pink-100 border-pink-200',
+                saturday: 'bg-indigo-100 border-indigo-200'
+              };
+
+              return (
+                <div 
+                  key={day} 
+                  className={`text-center p-4 rounded-lg border-2 ${dayColors[day as keyof typeof dayColors]} shadow-sm cursor-pointer hover:shadow-md transition-shadow duration-200`}
+                  onClick={() => handleDayClick(day)}
+                >
+                  <div className="text-sm font-semibold text-gray-700 mb-2">
+                    {dayLabels[day as keyof typeof dayLabels]}
+                  </div>
+                  <div className="text-xl font-bold text-gray-800 mb-1">{dayCustomers.length}</div>
+                  <div className="text-xs text-gray-600 mb-3">customers</div>
+                  <div className="text-sm font-semibold text-green-700">
+                    {formatCurrency(totalOutstanding)}
+                  </div>
+                  <div className="text-xs text-gray-600 mb-2">Outstanding</div>
+                  <div className="text-sm font-semibold text-purple-700">
+                    {formatCurrency(totalEMIAmount)}
+                  </div>
+                  <div className="text-xs text-gray-600 mb-2">EMI Amount</div>
+                  <div className="text-xs text-blue-600 font-medium">Click to collect</div>
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Current Day Highlight */}
       <Card className="border-primary">
@@ -339,36 +407,6 @@ const DaywisePayment: React.FC<DaywisePaymentProps> = ({ onUpdate }) => {
           );
         })}
       </div>
-
-      {/* Summary */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Payment Schedule Summary</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {daysOfWeek.map((day) => {
-              const dayCustomers = getCustomersByDay(day);
-              const totalOutstanding = dayCustomers.reduce((sum, customer) => {
-                return sum + calculateCustomerOutstanding(customer);
-              }, 0);
-              
-              return (
-                <div key={day} className="text-center p-3 bg-muted/50 rounded-lg">
-                  <div className="text-sm font-medium text-muted-foreground">
-                    {dayLabels[day as keyof typeof dayLabels]}
-                  </div>
-                  <div className="text-lg font-bold">{dayCustomers.length}</div>
-                  <div className="text-xs text-muted-foreground">customers</div>
-                  <div className="text-sm font-medium text-green-600">
-                    {formatCurrency(totalOutstanding)}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 };

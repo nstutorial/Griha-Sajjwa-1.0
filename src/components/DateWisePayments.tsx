@@ -16,6 +16,7 @@ interface LoanTransaction {
   amount: number;
   payment_date: string;
   transaction_type: string;
+  payment_mode: 'cash' | 'bank';
   notes: string | null;
   loan: {
     loan_number: string;
@@ -326,6 +327,9 @@ const DateWisePayments: React.FC<DateWisePaymentsProps> = ({ onUpdate }) => {
                               
                               <Badge variant="secondary" className="text-xs">
                                 {transaction.transaction_type}
+                              </Badge>
+                              <Badge variant="outline" className="text-xs">
+                                {transaction.payment_mode}
                               </Badge>
                             </div>
                             {transaction.notes && (

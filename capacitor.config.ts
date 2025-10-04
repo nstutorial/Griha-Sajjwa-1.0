@@ -2,7 +2,7 @@ import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.personalfinancehub.moneytracker',
-  appName: 'Money Tracker Pro',
+  appName: 'Griha Sajjwa',
   webDir: 'dist',
   server: {
     androidScheme: 'https'

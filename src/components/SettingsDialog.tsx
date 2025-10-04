@@ -19,10 +19,8 @@ interface SettingsDialogProps {
 }
 
 export interface TabSettings {
-  expenses: boolean;
   loans: boolean;
   customers: boolean;
-  sales: boolean;
   daywise: boolean;
   payments: boolean;
 }
@@ -31,10 +29,8 @@ const SettingsDialog = ({ open, onOpenChange, onSettingsUpdate }: SettingsDialog
   const { user } = useAuth();
   const { toast } = useToast();
   const [settings, setSettings] = useState<TabSettings>({
-    expenses: true,
     loans: true,
     customers: true,
-    sales: true,
     daywise: true,
     payments: true,
   });
@@ -73,10 +69,8 @@ const SettingsDialog = ({ open, onOpenChange, onSettingsUpdate }: SettingsDialog
       } else {
         // If no settings exist, use defaults and create them
         const defaultSettings = {
-          expenses: true,
           loans: true,
           customers: true,
-          sales: true,
           daywise: true,
           payments: true,
         };

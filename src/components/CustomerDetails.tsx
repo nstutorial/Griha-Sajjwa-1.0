@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useControl } from '@/contexts/ControlContext';
 import { supabase } from '@/integrations/supabase/client';
 import {
   Dialog,
@@ -49,6 +50,7 @@ interface LoanTransaction {
   amount: number;
   payment_date: string;
   transaction_type: string;
+  payment_mode: 'cash' | 'bank';
   notes: string | null;
   loan: {
     description: string | null;
@@ -63,6 +65,7 @@ interface CustomerDetailsProps {
 
 const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onBack }) => {
   const { user } = useAuth();
+  const { settings: controlSettings } = useControl();
   const { toast } = useToast();
   const [loans, setLoans] = useState<Loan[]>([]);
   const [transactions, setTransactions] = useState<LoanTransaction[]>([]);
@@ -74,6 +77,7 @@ const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onBack }) =
     amount: '',
     paymentType: 'principal' as 'principal' | 'interest' | 'mixed',
     notes: '',
+    payment_mode: 'cash' as 'cash' | 'bank',
   });
 
   useEffect(() => {
@@ -136,6 +140,7 @@ const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onBack }) =
           loan_id: selectedLoanId,
           amount: parseFloat(paymentData.amount),
           transaction_type: paymentData.paymentType,
+          payment_mode: paymentData.payment_mode,
           notes: paymentData.notes || null,
         });
 
@@ -150,6 +155,7 @@ const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onBack }) =
         amount: '',
         paymentType: 'principal',
         notes: '',
+        payment_mode: 'cash',
       });
       
       setShowPaymentDialog(false);
@@ -246,14 +252,16 @@ const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onBack }) =
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Active Loans</CardTitle>
-            <Button 
-              size="sm" 
-              onClick={() => setShowPaymentDialog(true)}
-              disabled={loans.filter(l => l.is_active).length === 0}
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Record Payment
-            </Button>
+            {controlSettings.allowRecordPayment && (
+              <Button 
+                size="sm" 
+                onClick={() => setShowPaymentDialog(true)}
+                disabled={loans.filter(l => l.is_active).length === 0}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Record Payment
+              </Button>
+            )}
           </CardHeader>
           <CardContent className="space-y-4">
             {loans.filter(l => l.is_active).map((loan) => {
@@ -300,9 +308,14 @@ const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onBack }) =
                 <div key={transaction.id} className="flex justify-between items-center p-3 border rounded-lg">
                   <div>
                     <p className="font-medium">{transaction.loan?.description || 'Loan Payment'}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {new Date(transaction.payment_date).toLocaleDateString()} • {transaction.transaction_type}
-                    </p>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <span>{new Date(transaction.payment_date).toLocaleDateString()}</span>
+                      <span>•</span>
+                      <span>{transaction.transaction_type}</span>
+                      <Badge variant="outline" className="text-xs">
+                        {transaction.payment_mode}
+                      </Badge>
+                    </div>
                     {transaction.notes && (
                       <p className="text-xs text-muted-foreground mt-1">{transaction.notes}</p>
                     )}
@@ -407,6 +420,24 @@ const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onBack }) =
             </div>
 
             <div className="space-y-2">
+              <Label>Payment Mode</Label>
+              <Select 
+                value={paymentData.payment_mode} 
+                onValueChange={(value: 'cash' | 'bank') => 
+                  setPaymentData({ ...paymentData, payment_mode: value })
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="bank">Bank Transfer</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="notes">Notes (Optional)</Label>
               <Input
                 id="notes"
@@ -417,9 +448,11 @@ const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onBack }) =
               />
             </div>
 
-            <Button type="submit" className="w-full" disabled={loading || !selectedLoanId}>
-              {loading ? 'Recording...' : 'Record Payment'}
-            </Button>
+            {controlSettings.allowRecordPayment && (
+              <Button type="submit" className="w-full" disabled={loading || !selectedLoanId}>
+                {loading ? 'Recording...' : 'Record Payment'}
+              </Button>
+            )}
           </form>
         </DialogContent>
       </Dialog>

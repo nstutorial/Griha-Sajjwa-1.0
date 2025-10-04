@@ -39,6 +39,7 @@ interface LoanTransaction {
   amount: number;
   payment_date: string;
   transaction_type: string;
+  payment_mode: 'cash' | 'bank';
   notes: string | null;
   loan: {
     loan_number: string;
@@ -161,7 +162,7 @@ const CustomerStatement: React.FC<CustomerStatementProps> = ({ customer }) => {
       if (isInRange) {
         allEntries.push({
           date: transaction.payment_date,
-          description: `Payment Received - ${transaction.loan.description || 'Loan'} (${transaction.loan.loan_number})`,
+          description: `Payment Received - ${transaction.loan.description || 'Loan'} (${transaction.loan.loan_number}) - ${transaction.transaction_type} via ${transaction.payment_mode}`,
           reference: transaction.id,
           debit: 0,
           credit: transaction.amount,

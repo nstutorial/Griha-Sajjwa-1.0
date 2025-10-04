@@ -11,10 +11,8 @@ import { ArrowLeft, Settings as SettingsIcon } from 'lucide-react';
 import { useControl } from '@/contexts/ControlContext';
 
 export interface TabSettings {
-  expenses: boolean;
   loans: boolean;
   customers: boolean;
-  sales: boolean;
   daywise: boolean;
   payments: boolean;
 }
@@ -26,6 +24,9 @@ export interface ControlSettings {
   allowExport: boolean;
   showFinancialTotals: boolean;
   allowBulkOperations: boolean;
+  allowAddPayment: boolean;
+  allowPaymentManager: boolean;
+  allowRecordPayment: boolean;
 }
 
 const Settings = () => {
@@ -34,10 +35,8 @@ const Settings = () => {
   const navigate = useNavigate();
   const { refreshSettings } = useControl();
   const [settings, setSettings] = useState<TabSettings>({
-    expenses: true,
     loans: true,
     customers: true,
-    sales: true,
     daywise: true,
     payments: true,
   });
@@ -48,6 +47,9 @@ const Settings = () => {
     allowExport: true,
     showFinancialTotals: true,
     allowBulkOperations: true,
+    allowAddPayment: true,
+    allowPaymentManager: true,
+    allowRecordPayment: true,
   });
   const [isUpdating, setIsUpdating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -82,14 +84,16 @@ const Settings = () => {
             variant: 'destructive',
           });
           // Use defaults and don't return
-          setControlSettings({
-            allowEdit: true,
-            allowDelete: true,
-            allowAddNew: true,
-            allowExport: true,
-            showFinancialTotals: true,
-            allowBulkOperations: true,
-          });
+        setControlSettings({
+          allowEdit: true,
+          allowDelete: true,
+          allowAddNew: true,
+          allowExport: true,
+          showFinancialTotals: true,
+          allowBulkOperations: true,
+          allowAddPayment: true,
+          allowPaymentManager: true,
+        });
         } else {
           toast({
             title: 'Error',
@@ -105,26 +109,34 @@ const Settings = () => {
         setSettings(settings);
         
         // Try to load control settings from database
+        const defaultControlSettings = {
+          allowEdit: true,
+          allowDelete: true,
+          allowAddNew: true,
+          allowExport: true,
+          showFinancialTotals: true,
+          allowBulkOperations: true,
+          allowAddPayment: true,
+          allowPaymentManager: true,
+          allowRecordPayment: true,
+        };
+        
         if ((data as any)?.control_settings) {
-          setControlSettings((data as any).control_settings);
+          // Merge database settings with defaults to ensure all fields are present
+          const dbSettings = (data as any).control_settings;
+          setControlSettings({
+            ...defaultControlSettings,
+            ...dbSettings
+          });
         } else {
           // Use defaults if control_settings not found
-          setControlSettings({
-            allowEdit: true,
-            allowDelete: true,
-            allowAddNew: true,
-            allowExport: true,
-            showFinancialTotals: true,
-            allowBulkOperations: true,
-          });
+          setControlSettings(defaultControlSettings);
         }
       } else {
         // If no settings exist, use defaults and create them
         const defaultSettings = {
-          expenses: true,
           loans: true,
           customers: true,
-          sales: true,
           daywise: true,
           payments: true,
         };
@@ -136,6 +148,8 @@ const Settings = () => {
           allowExport: true,
           showFinancialTotals: true,
           allowBulkOperations: true,
+          allowAddPayment: true,
+          allowPaymentManager: true,
         };
         
         setSettings(defaultSettings);
@@ -329,10 +343,8 @@ const Settings = () => {
 
   const resetToDefaults = async () => {
     const defaultSettings = {
-      expenses: true,
       loans: true,
       customers: true,
-      sales: true,
       daywise: true,
       payments: true,
     };
@@ -344,6 +356,9 @@ const Settings = () => {
       allowExport: true,
       showFinancialTotals: true,
       allowBulkOperations: true,
+      allowAddPayment: true,
+      allowPaymentManager: true,
+      allowRecordPayment: true,
     };
 
     setSettings(defaultSettings);
@@ -438,10 +453,8 @@ const Settings = () => {
                         {key === 'daywise' ? 'Daywise Payment' : key}
                       </Label>
                       <p className="text-sm text-muted-foreground">
-                        {key === 'expenses' && 'Track and manage your expenses'}
                         {key === 'loans' && 'Manage loans and repayments'}
                         {key === 'customers' && 'Customer management and details'}
-                        {key === 'sales' && 'Sales tracking and records'}
                         {key === 'daywise' && 'Daily payment schedule overview'}
                         {key === 'payments' && 'Payment history and tracking'}
                       </p>
@@ -491,6 +504,9 @@ const Settings = () => {
                         {key === 'allowExport' && 'Export Functions'}
                         {key === 'showFinancialTotals' && 'Financial Totals Display'}
                         {key === 'allowBulkOperations' && 'Bulk Operations'}
+                        {key === 'allowAddPayment' && 'Add Payment Operations'}
+                        {key === 'allowPaymentManager' && 'Payment Manager Tab'}
+                        {key === 'allowRecordPayment' && 'Record Payment Button'}
                       </Label>
                       <p className="text-sm text-muted-foreground">
                         {key === 'allowEdit' && 'Show/hide edit buttons and modify forms throughout the app'}
@@ -499,6 +515,9 @@ const Settings = () => {
                         {key === 'allowExport' && 'Enable/disable CSV export, PDF generation, and data downloads'}
                         {key === 'showFinancialTotals' && 'Display/hide financial summaries and totals in reports'}
                         {key === 'allowBulkOperations' && 'Enable/disable multi-record operations and batch actions'}
+                        {key === 'allowAddPayment' && 'Show/hide Add Payment buttons in loan lists and payment forms'}
+                        {key === 'allowPaymentManager' && 'Show/hide Payment Manager tab in Customers section'}
+                        {key === 'allowRecordPayment' && 'Show/hide Record Payment button in loan details and payment dialogs'}
                       </p>
                     </div>
                     <Switch

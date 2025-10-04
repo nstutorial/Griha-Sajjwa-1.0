@@ -43,6 +43,8 @@ const AddLoanDialog: React.FC<AddLoanDialogProps> = ({ onLoanAdded }) => {
     description: '',
     interestRate: '',
     interestType: 'none' as 'daily' | 'monthly' | 'none',
+    emiAmount: '',
+    emiFrequency: 'weekly' as 'weekly' | 'monthly',
     loanDate: new Date().toISOString().split('T')[0],
     dueDate: '',
   });
@@ -83,6 +85,8 @@ const AddLoanDialog: React.FC<AddLoanDialogProps> = ({ onLoanAdded }) => {
           description: formData.description,
           interest_rate: formData.interestType === 'none' ? 0 : parseFloat(formData.interestRate),
           interest_type: formData.interestType,
+          emi_amount: formData.emiAmount ? parseFloat(formData.emiAmount) : null,
+          emi_frequency: formData.emiFrequency,
           loan_date: formData.loanDate,
           due_date: formData.dueDate || null,
         });
@@ -100,6 +104,8 @@ const AddLoanDialog: React.FC<AddLoanDialogProps> = ({ onLoanAdded }) => {
         description: '',
         interestRate: '',
         interestType: 'none',
+        emiAmount: '',
+        emiFrequency: 'weekly',
         loanDate: new Date().toISOString().split('T')[0],
         dueDate: '',
       });
@@ -126,7 +132,7 @@ const AddLoanDialog: React.FC<AddLoanDialogProps> = ({ onLoanAdded }) => {
           Add Loan
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[425px] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create New Loan</DialogTitle>
         </DialogHeader>
@@ -202,6 +208,34 @@ const AddLoanDialog: React.FC<AddLoanDialogProps> = ({ onLoanAdded }) => {
               />
             </div>
           )}
+
+          <div className="space-y-2">
+            <Label htmlFor="emi-amount">EMI Amount (₹)</Label>
+            <Input
+              id="emi-amount"
+              type="number"
+              step="0.01"
+              placeholder="Enter EMI amount"
+              value={formData.emiAmount}
+              onChange={(e) => setFormData({ ...formData, emiAmount: e.target.value })}
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label>EMI Frequency</Label>
+            <Select 
+              value={formData.emiFrequency} 
+              onValueChange={(value: 'weekly' | 'monthly') => setFormData({ ...formData, emiFrequency: value })}
+            >
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="weekly">Weekly</SelectItem>
+                <SelectItem value="monthly">Monthly</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
           <div className="space-y-2">
             <Label htmlFor="loan-date">Loan Date</Label>
