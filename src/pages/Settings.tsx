@@ -4,10 +4,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Settings as SettingsIcon } from 'lucide-react';
+import { ArrowLeft, Settings as SettingsIcon, Mail, Edit3, Shield } from 'lucide-react';
 import { useControl } from '@/contexts/ControlContext';
 
 export interface TabSettings {
@@ -27,6 +30,7 @@ export interface ControlSettings {
   allowAddPayment: boolean;
   allowPaymentManager: boolean;
   allowRecordPayment: boolean;
+  allowEmailChange: boolean;
 }
 
 const Settings = () => {
@@ -50,17 +54,45 @@ const Settings = () => {
     allowAddPayment: true,
     allowPaymentManager: true,
     allowRecordPayment: true,
+    allowEmailChange: true,
   });
   const [isUpdating, setIsUpdating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
+  const [newEmail, setNewEmail] = useState('');
+  const [isChangingEmail, setIsChangingEmail] = useState(false);
+  const [userRole, setUserRole] = useState<string>('employee');
+  const [emailChangeMethod, setEmailChangeMethod] = useState<'confirmation' | 'direct'>('direct');
 
   useEffect(() => {
     if (user) {
       fetchSettings();
+      fetchUserRole();
     } else {
       setIsLoading(false);
     }
   }, [user]);
+
+  const fetchUserRole = async () => {
+    if (!user) return;
+    
+    try {
+      // Use a database function to get user role without RLS issues
+      const { data, error } = await supabase.rpc('get_user_role', {
+        user_id_param: user.id
+      });
+
+      if (error) {
+        console.error('Error fetching user role:', error);
+        setUserRole('employee');
+      } else {
+        setUserRole(data || 'employee');
+      }
+    } catch (error) {
+      console.error('Error in fetchUserRole:', error);
+      setUserRole('employee');
+    }
+  };
 
   const fetchSettings = async () => {
     if (!user) return;
@@ -119,6 +151,7 @@ const Settings = () => {
           allowAddPayment: true,
           allowPaymentManager: true,
           allowRecordPayment: true,
+          allowEmailChange: true,
         };
         
         if ((data as any)?.control_settings) {
@@ -150,6 +183,7 @@ const Settings = () => {
           allowBulkOperations: true,
           allowAddPayment: true,
           allowPaymentManager: true,
+          allowEmailChange: true,
         };
         
         setSettings(defaultSettings);
@@ -341,6 +375,63 @@ const Settings = () => {
     }
   };
 
+  const handleEmailChange = async () => {
+    if (!user || !newEmail.trim()) return;
+    
+    setIsChangingEmail(true);
+    
+    try {
+      if (emailChangeMethod === 'direct') {
+        // Direct email change - use admin API to update user
+        const { error } = await supabase.auth.admin.updateUserById(user.id, {
+          email: newEmail.trim()
+        });
+        
+        if (error) {
+          toast({
+            variant: "destructive",
+            title: "Email Change Error",
+            description: error.message,
+          });
+        } else {
+          toast({
+            title: "Email Updated",
+            description: "Your email address has been updated successfully.",
+          });
+        }
+      } else {
+        // Confirmation method - send confirmation link
+        const { error } = await supabase.auth.updateUser({
+          email: newEmail.trim()
+        });
+        
+        if (error) {
+          toast({
+            variant: "destructive",
+            title: "Email Change Error",
+            description: error.message,
+          });
+        } else {
+          toast({
+            title: "Check your email",
+            description: "We've sent a confirmation link to your new email address.",
+          });
+        }
+      }
+      
+      setIsEmailDialogOpen(false);
+      setNewEmail('');
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Email Change Error",
+        description: error.message || "An unexpected error occurred",
+      });
+    } finally {
+      setIsChangingEmail(false);
+    }
+  };
+
   const resetToDefaults = async () => {
     const defaultSettings = {
       loans: true,
@@ -359,6 +450,7 @@ const Settings = () => {
       allowAddPayment: true,
       allowPaymentManager: true,
       allowRecordPayment: true,
+      allowEmailChange: true,
     };
 
     setSettings(defaultSettings);
@@ -408,6 +500,38 @@ const Settings = () => {
     );
   }
 
+  // Check if user is admin, if not show access denied
+  if (userRole !== 'admin') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center max-w-md mx-auto px-4">
+          <div className="mb-6">
+            <Shield className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+            <h1 className="text-2xl font-bold text-foreground mb-2">Access Denied</h1>
+            <p className="text-muted-foreground mb-6">
+              You don't have permission to access the Settings page. This page is only available for administrators.
+            </p>
+          </div>
+          
+          <div className="space-y-4">
+            <Button
+              onClick={() => navigate('/')}
+              className="w-full"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Dashboard
+            </Button>
+            
+            <div className="text-sm text-muted-foreground">
+              <p>Current role: <span className="font-medium capitalize">{userRole}</span></p>
+              <p>Required role: <span className="font-medium">admin</span></p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8">
@@ -436,6 +560,145 @@ const Settings = () => {
 
         {/* Settings Content */}
         <div className="max-w-2xl space-y-6">
+          {/* User Profile Settings */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="h-5 w-5" />
+                User Profile Settings
+              </CardTitle>
+              <CardDescription>
+                Manage your account information and role
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Current User Info */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="space-y-1">
+                    <Label className="text-base font-medium">Current Email</Label>
+                    <p className="text-sm text-muted-foreground">{user?.email}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs px-2 py-1 bg-primary/10 text-primary rounded-full capitalize">
+                      {userRole}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Email Change Section */}
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="space-y-1">
+                    <Label className="text-base font-medium">Change Email Address</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Update your email address with or without confirmation.
+                    </p>
+                  </div>
+                  <Dialog open={isEmailDialogOpen} onOpenChange={setIsEmailDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        disabled={!controlSettings.allowEmailChange}
+                        className="flex items-center gap-2"
+                      >
+                        <Edit3 className="h-4 w-4" />
+                        Change Email
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Change Email Address</DialogTitle>
+                        <DialogDescription>
+                          Enter your new email address and choose how you want to update it.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="new-email">New Email Address</Label>
+                          <Input
+                            id="new-email"
+                            type="email"
+                            placeholder="Enter new email address"
+                            value={newEmail}
+                            onChange={(e) => setNewEmail(e.target.value)}
+                            disabled={isChangingEmail}
+                          />
+                        </div>
+                        
+                        <div className="space-y-3">
+                          <Label>Change Method</Label>
+                          <RadioGroup
+                            value={emailChangeMethod}
+                            onValueChange={(value: 'confirmation' | 'direct') => setEmailChangeMethod(value)}
+                            disabled={isChangingEmail}
+                          >
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="direct" id="direct" />
+                              <Label htmlFor="direct" className="text-sm">
+                                Direct change (No confirmation) - Recommended
+                              </Label>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <RadioGroupItem value="confirmation" id="confirmation" />
+                              <Label htmlFor="confirmation" className="text-sm">
+                                Send confirmation link
+                              </Label>
+                            </div>
+                          </RadioGroup>
+                          <p className="text-xs text-muted-foreground">
+                            {emailChangeMethod === 'confirmation' 
+                              ? 'A confirmation link will be sent to your new email address.'
+                              : 'Email will be changed immediately without confirmation.'
+                            }
+                          </p>
+                        </div>
+                        
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="outline"
+                            onClick={() => {
+                              setIsEmailDialogOpen(false);
+                              setNewEmail('');
+                              setEmailChangeMethod('direct');
+                            }}
+                            disabled={isChangingEmail}
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            onClick={handleEmailChange}
+                            disabled={isChangingEmail || !newEmail.trim()}
+                          >
+                            {isChangingEmail 
+                              ? (emailChangeMethod === 'direct' ? 'Updating...' : 'Sending...') 
+                              : (emailChangeMethod === 'direct' ? 'Update Email' : 'Send Confirmation')
+                            }
+                          </Button>
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+
+                {/* Email Change Control */}
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="space-y-1">
+                    <Label className="text-base font-medium">Email Change Permission</Label>
+                    <p className="text-sm text-muted-foreground">
+                      Allow users to change their email address
+                    </p>
+                  </div>
+                  <Switch
+                    checked={controlSettings.allowEmailChange}
+                    disabled={isUpdating}
+                    onCheckedChange={() => handleControlToggle('allowEmailChange')}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Tab Visibility Settings */}
           <Card>
             <CardHeader>
@@ -507,6 +770,7 @@ const Settings = () => {
                         {key === 'allowAddPayment' && 'Add Payment Operations'}
                         {key === 'allowPaymentManager' && 'Payment Manager Tab'}
                         {key === 'allowRecordPayment' && 'Record Payment Button'}
+                        {key === 'allowEmailChange' && 'Email Change Permission'}
                       </Label>
                       <p className="text-sm text-muted-foreground">
                         {key === 'allowEdit' && 'Show/hide edit buttons and modify forms throughout the app'}
@@ -518,6 +782,7 @@ const Settings = () => {
                         {key === 'allowAddPayment' && 'Show/hide Add Payment buttons in loan lists and payment forms'}
                         {key === 'allowPaymentManager' && 'Show/hide Payment Manager tab in Customers section'}
                         {key === 'allowRecordPayment' && 'Show/hide Record Payment button in loan details and payment dialogs'}
+                        {key === 'allowEmailChange' && 'Enable/disable email change functionality for users'}
                       </p>
                     </div>
                     <Switch

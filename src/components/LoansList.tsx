@@ -39,6 +39,7 @@ interface Loan {
   due_date?: string;
   description?: string;
   is_active: boolean;
+  customer_id: string;
   customers: {
     name: string;
     phone?: string;
@@ -116,7 +117,7 @@ const LoansList: React.FC<LoansListProps> = ({ onUpdate, status = 'active' }) =>
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setLoans((data as Loan[]) || []);
+      setLoans((data as any[]) || []);
     } catch (error) {
       console.error('Error fetching loans:', error);
       toast({
@@ -138,7 +139,7 @@ const LoansList: React.FC<LoansListProps> = ({ onUpdate, status = 'active' }) =>
         .order('payment_date', { ascending: false });
 
       if (error) throw error;
-      setTransactions((data as LoanTransaction[]) || []);
+      setTransactions((data as any[]) || []);
     } catch (error) {
       console.error('Error fetching transactions:', error);
       toast({
@@ -530,7 +531,7 @@ Generated on: ${new Date().toLocaleDateString()}
           .from('loan_transactions')
           .select('*')
           .in('loan_id', loanIds);
-        setTransactions((data as LoanTransaction[]) || []);
+        setTransactions((data as any[]) || []);
       };
       fetchAllTransactions();
     }

@@ -146,13 +146,18 @@ const Dashboard = () => {
 
   const handleSignOut = async () => {
     try {
+      console.log('Dashboard: Starting sign out...');
       await signOut();
-      toast({
-        title: 'Signed out',
-        description: 'You have been signed out successfully',
-      });
-      navigate('/auth');
+      
+      console.log('Dashboard: Sign out completed, redirecting to auth page...');
+      
+      // Force navigation to auth page as backup
+      setTimeout(() => {
+        navigate('/auth', { replace: true });
+      }, 100);
+      
     } catch (error) {
+      console.error('Dashboard: Sign out error:', error);
       toast({
         title: 'Error',
         description: 'Failed to sign out',

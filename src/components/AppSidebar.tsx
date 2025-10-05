@@ -12,6 +12,8 @@ import {
 } from '@/components/ui/sidebar';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useAuth } from '@/contexts/AuthContext';
+import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 
 interface AppSidebarProps {
   onSettingsClick: () => void;
@@ -21,10 +23,37 @@ interface AppSidebarProps {
 export function AppSidebar({ onSettingsClick, onProfileClick }: AppSidebarProps) {
   const { state } = useSidebar();
   const { user } = useAuth();
+  const [userRole, setUserRole] = useState<string>('employee');
+
+  useEffect(() => {
+    if (user) {
+      fetchUserRole();
+    }
+  }, [user]);
+
+  const fetchUserRole = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase.rpc('get_user_role', {
+        user_id_param: user.id
+      });
+
+      if (error) {
+        console.error('Error fetching user role:', error);
+        setUserRole('employee');
+      } else {
+        setUserRole(data || 'employee');
+      }
+    } catch (error) {
+      console.error('Error in fetchUserRole:', error);
+      setUserRole('employee');
+    }
+  };
 
   const menuItems = [
     { title: 'Profile', icon: User, onClick: onProfileClick },
-    { title: 'Settings', icon: Settings, onClick: onSettingsClick },
+    ...(userRole === 'admin' ? [{ title: 'Settings', icon: Settings, onClick: onSettingsClick }] : []),
   ];
 
   return (

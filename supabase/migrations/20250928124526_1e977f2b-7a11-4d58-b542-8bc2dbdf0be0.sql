@@ -243,6 +243,13 @@ BEGIN
     (NEW.id, 'Entertainment'),
     (NEW.id, 'Others');
   
+  -- Create default user settings
+  INSERT INTO public.user_settings (user_id, visible_tabs, control_settings) VALUES
+    (NEW.id, 
+     '{"loans": true, "customers": true, "daywise": true, "payments": true}'::jsonb,
+     '{"allowEdit": true, "allowDelete": true, "allowAddNew": true, "allowExport": true, "showFinancialTotals": true, "allowBulkOperations": true, "allowPaymentManager": true}'::jsonb
+    );
+  
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
