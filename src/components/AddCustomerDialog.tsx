@@ -43,16 +43,53 @@ const AddCustomerDialog = ({ onCustomerAdded }: AddCustomerDialogProps) => {
     e.preventDefault();
     if (!user) return;
 
+    // Validate all required fields
+    if (!formData.name.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Validation Error",
+        description: "Customer name is required.",
+      });
+      return;
+    }
+
+    if (!formData.phone.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Validation Error",
+        description: "Phone number is required.",
+      });
+      return;
+    }
+
+    if (!formData.address.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Validation Error",
+        description: "Address is required.",
+      });
+      return;
+    }
+
+    if (!formData.payment_day) {
+      toast({
+        variant: "destructive",
+        title: "Validation Error",
+        description: "Preferred payment day is required.",
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       const { error } = await supabase
         .from('customers')
         .insert({
           user_id: user.id,
-          name: formData.name,
-          phone: formData.phone || null,
-          address: formData.address || null,
-          payment_day: formData.payment_day || null,
+          name: formData.name.trim(),
+          phone: formData.phone.trim(),
+          address: formData.address.trim(),
+          payment_day: formData.payment_day,
         });
 
       if (error) throw error;
@@ -97,7 +134,7 @@ const AddCustomerDialog = ({ onCustomerAdded }: AddCustomerDialogProps) => {
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="name">Name</Label>
+            <Label htmlFor="name">Name *</Label>
             <Input
               id="name"
               type="text"
@@ -109,31 +146,34 @@ const AddCustomerDialog = ({ onCustomerAdded }: AddCustomerDialogProps) => {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="phone">Phone Number (Optional)</Label>
+            <Label htmlFor="phone">Phone Number *</Label>
             <Input
               id="phone"
               type="tel"
               placeholder="Enter phone number"
               value={formData.phone}
               onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+              required
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="address">Address (Optional)</Label>
+            <Label htmlFor="address">Address *</Label>
             <Textarea
               id="address"
               placeholder="Enter customer address"
               value={formData.address}
               onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+              required
             />
           </div>
 
           <div className="space-y-2">
-            <Label>Preferred Payment Day (Optional)</Label>
+            <Label>Preferred Payment Day *</Label>
             <Select 
               value={formData.payment_day} 
               onValueChange={(value: string) => setFormData({ ...formData, payment_day: value })}
+              required
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select payment day" />
@@ -150,6 +190,10 @@ const AddCustomerDialog = ({ onCustomerAdded }: AddCustomerDialogProps) => {
             </Select>
           </div>
 
+          <div className="text-sm text-muted-foreground">
+            * All fields are required
+          </div>
+          
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? 'Adding...' : 'Add Customer'}
           </Button>
