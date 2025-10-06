@@ -10,7 +10,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Settings as SettingsIcon, Mail, Edit3, Shield } from 'lucide-react';
+import { ArrowLeft, Settings as SettingsIcon, Mail, Edit3, Shield, Lock } from 'lucide-react';
 import { useControl } from '@/contexts/ControlContext';
 
 export interface TabSettings {
@@ -61,36 +61,154 @@ const Settings = () => {
   const [isEmailDialogOpen, setIsEmailDialogOpen] = useState(false);
   const [newEmail, setNewEmail] = useState('');
   const [isChangingEmail, setIsChangingEmail] = useState(false);
-  const [userRole, setUserRole] = useState<string>('employee');
   const [emailChangeMethod, setEmailChangeMethod] = useState<'confirmation' | 'direct'>('direct');
+  const [isPasswordVerified, setIsPasswordVerified] = useState(false);
+  const [passwordPromptOpen, setPasswordPromptOpen] = useState(true);
+  const [enteredPassword, setEnteredPassword] = useState('');
+  const [isVerifyingPassword, setIsVerifyingPassword] = useState(false);
+  const [userRole, setUserRole] = useState<string>('employee');
 
   useEffect(() => {
     if (user) {
       fetchSettings();
       fetchUserRole();
+      // Check if password was already verified in this session
+      const sessionPasswordVerified = sessionStorage.getItem('settingsPasswordVerified');
+      if (sessionPasswordVerified === 'true') {
+        setIsPasswordVerified(true);
+        setPasswordPromptOpen(false);
+      }
     } else {
       setIsLoading(false);
     }
   }, [user]);
 
+  // Check if user is admin and bypass password verification
+  useEffect(() => {
+    console.log('=== SETTINGS ACCESS LOGIC ===');
+    console.log('User role:', userRole);
+    console.log('User:', user?.email);
+    
+    if (userRole === 'admin') {
+      console.log('✅ ADMIN: Direct access granted');
+      setIsPasswordVerified(true);
+      setPasswordPromptOpen(false);
+    } else if (userRole === 'employee') {
+      console.log('🔒 EMPLOYEE: Checking password verification');
+      const sessionPasswordVerified = sessionStorage.getItem('settingsPasswordVerified');
+      if (sessionPasswordVerified === 'true') {
+        console.log('✅ Password already verified in session');
+        setIsPasswordVerified(true);
+        setPasswordPromptOpen(false);
+      } else {
+        console.log('❌ Password required');
+        setIsPasswordVerified(false);
+        setPasswordPromptOpen(true);
+      }
+    } else {
+      console.log('❓ Unknown role:', userRole);
+      // Default to employee behavior
+      setIsPasswordVerified(false);
+      setPasswordPromptOpen(true);
+    }
+  }, [userRole]);
+
   const fetchUserRole = async () => {
     if (!user) return;
     
+    console.log('Fetching user role for user:', user.id, user.email);
+    
     try {
-      // Use a database function to get user role without RLS issues
-      const { data, error } = await supabase.rpc('get_user_role', {
-        user_id_param: user.id
-      });
+      // Direct query to profiles table instead of RPC function
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('user_role')
+        .eq('user_id', user.id)
+        .single();
 
       if (error) {
         console.error('Error fetching user role:', error);
-        setUserRole('employee');
+        console.log('Database Error details:', error);
+        
+        // Special handling for known admin email
+        if (user.email === 'fakiragram@grihasajjwa.com') {
+          console.log('🚨 EMERGENCY: Known admin email detected, forcing admin role');
+          setUserRole('admin');
+        } else {
+          setUserRole('employee'); // Default to employee on error
+        }
       } else {
-        setUserRole(data || 'employee');
+        console.log('Database result:', data);
+        console.log('Setting user role to:', data?.user_role || 'employee');
+        setUserRole(data?.user_role || 'employee'); // Default to employee if no data
       }
     } catch (error) {
       console.error('Error in fetchUserRole:', error);
-      setUserRole('employee');
+      
+      // Special handling for known admin email
+      if (user.email === 'fakiragram@grihasajjwa.com') {
+        console.log('🚨 EMERGENCY: Known admin email detected, forcing admin role');
+        setUserRole('admin');
+      } else {
+        setUserRole('employee'); // Default to employee on error
+      }
+    }
+  };
+
+  const verifyPassword = async () => {
+    setIsVerifyingPassword(true);
+    
+    try {
+      // Check password against database - get all active passwords
+      const { data, error } = await supabase
+        .from('settings_access_password' as any)
+        .select('password_hash')
+        .eq('is_active', true);
+
+      if (error) {
+        console.error('Error fetching password:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to verify password. Please try again.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Check if any of the active passwords match
+      const passwords = data as any[];
+      const isValidPassword = passwords.some(pwd => enteredPassword === pwd.password_hash);
+
+      if (isValidPassword) {
+        setIsPasswordVerified(true);
+        setPasswordPromptOpen(false);
+        sessionStorage.setItem('settingsPasswordVerified', 'true');
+        toast({
+          title: 'Access Granted',
+          description: 'Password verified successfully',
+        });
+      } else {
+        toast({
+          title: 'Access Denied',
+          description: 'Incorrect password. Please try again.',
+          variant: 'destructive',
+        });
+        setEnteredPassword('');
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'An error occurred while verifying password',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsVerifyingPassword(false);
+    }
+  };
+
+  const handlePasswordKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      verifyPassword();
     }
   };
 
@@ -125,6 +243,8 @@ const Settings = () => {
           allowBulkOperations: true,
           allowAddPayment: true,
           allowPaymentManager: true,
+          allowRecordPayment: true,
+          allowEmailChange: true,
         });
         } else {
           toast({
@@ -183,6 +303,7 @@ const Settings = () => {
           allowBulkOperations: true,
           allowAddPayment: true,
           allowPaymentManager: true,
+          allowRecordPayment: true,
           allowEmailChange: true,
         };
         
@@ -500,32 +621,51 @@ const Settings = () => {
     );
   }
 
-  // Check if user is admin, if not show access denied
-  if (userRole !== 'admin') {
+  // Show password prompt if not verified and not admin
+  if (!isPasswordVerified && userRole !== 'admin') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center max-w-md mx-auto px-4">
           <div className="mb-6">
-            <Shield className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-            <h1 className="text-2xl font-bold text-foreground mb-2">Access Denied</h1>
+            <Lock className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+            <h1 className="text-2xl font-bold text-foreground mb-2">Settings Access</h1>
             <p className="text-muted-foreground mb-6">
-              You don't have permission to access the Settings page. This page is only available for administrators.
+              Please enter the password to access the Settings page.
             </p>
           </div>
           
           <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="settings-password">Password</Label>
+              <Input
+                id="settings-password"
+                type="password"
+                placeholder="Enter password"
+                value={enteredPassword}
+                onChange={(e) => setEnteredPassword(e.target.value)}
+                onKeyPress={handlePasswordKeyPress}
+                disabled={isVerifyingPassword}
+                className="text-center"
+              />
+            </div>
+            
             <Button
+              onClick={verifyPassword}
+              disabled={isVerifyingPassword || !enteredPassword.trim()}
+              className="w-full"
+            >
+              {isVerifyingPassword ? 'Verifying...' : 'Access Settings'}
+            </Button>
+            
+            <Button
+              variant="outline"
               onClick={() => navigate('/')}
               className="w-full"
+              disabled={isVerifyingPassword}
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Dashboard
             </Button>
-            
-            <div className="text-sm text-muted-foreground">
-              <p>Current role: <span className="font-medium capitalize">{userRole}</span></p>
-              <p>Required role: <span className="font-medium">admin</span></p>
-            </div>
           </div>
         </div>
       </div>
@@ -547,6 +687,17 @@ const Settings = () => {
               <ArrowLeft className="h-4 w-4" />
               Back to Dashboard
             </Button>
+            {userRole === 'admin' && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate('/password-management')}
+                className="flex items-center gap-2"
+              >
+                <Lock className="h-4 w-4" />
+                Manage Access Password
+              </Button>
+            )}
           </div>
           
           <div className="flex items-center gap-3">
@@ -554,6 +705,9 @@ const Settings = () => {
             <div>
               <h1 className="text-3xl font-bold">Settings</h1>
               <p className="text-muted-foreground">Manage your application preferences</p>
+              {userRole === 'admin' && (
+                <p className="text-sm text-green-600 font-medium">Admin Access - No password required</p>
+              )}
             </div>
           </div>
         </div>

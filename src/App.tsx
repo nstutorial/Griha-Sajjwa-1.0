@@ -11,6 +11,7 @@ import Settings from "./pages/Settings";
 import Profile from "./pages/Profile";
 import Auth from "./pages/Auth";
 import CollectionPage from "./pages/CollectionPage";
+import PasswordManagement from "./pages/PasswordManagement";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -88,6 +89,11 @@ const AppRoutes = () => {
       <Route path="/collection" element={
         <ProtectedRoute>
           <CollectionPage />
+        </ProtectedRoute>
+      } />
+      <Route path="/password-management" element={
+        <ProtectedRoute>
+          <PasswordManagement />
         </ProtectedRoute>
       } />
       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

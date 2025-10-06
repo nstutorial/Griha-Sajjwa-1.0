@@ -220,6 +220,7 @@ export type Database = {
           phone: string | null
           updated_at: string
           user_id: string
+          user_role: string
         }
         Insert: {
           created_at?: string
@@ -228,6 +229,7 @@ export type Database = {
           phone?: string | null
           updated_at?: string
           user_id: string
+          user_role?: string
         }
         Update: {
           created_at?: string
@@ -236,6 +238,7 @@ export type Database = {
           phone?: string | null
           updated_at?: string
           user_id?: string
+          user_role?: string
         }
         Relationships: []
       }
@@ -342,6 +345,41 @@ export type Database = {
         }
         Relationships: []
       }
+      settings_access_password: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          is_active: boolean
+          password_hash: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          id?: string
+          is_active?: boolean
+          password_hash: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          is_active?: boolean
+          password_hash?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "settings_access_password_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -349,6 +387,12 @@ export type Database = {
     Functions: {
       generate_loan_number: {
         Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      get_user_role: {
+        Args: {
+          user_id_param: string
+        }
         Returns: string
       }
     }
