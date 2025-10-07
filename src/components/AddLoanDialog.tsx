@@ -27,13 +27,15 @@ interface Customer {
 }
 
 interface AddLoanDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  customer?: Customer | null;
   onLoanAdded: () => void;
 }
 
-const AddLoanDialog: React.FC<AddLoanDialogProps> = ({ onLoanAdded }) => {
+const AddLoanDialog: React.FC<AddLoanDialogProps> = ({ open, onOpenChange, customer, onLoanAdded }) => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [open, setOpen] = useState(false);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [loading, setLoading] = useState(false);
   
@@ -54,6 +56,12 @@ const AddLoanDialog: React.FC<AddLoanDialogProps> = ({ onLoanAdded }) => {
       fetchCustomers();
     }
   }, [user, open]);
+
+  useEffect(() => {
+    if (customer && open) {
+      setFormData(prev => ({ ...prev, customerId: customer.id }));
+    }
+  }, [customer, open]);
 
   const fetchCustomers = async () => {
     try {
@@ -110,7 +118,7 @@ const AddLoanDialog: React.FC<AddLoanDialogProps> = ({ onLoanAdded }) => {
         dueDate: '',
       });
       
-      setOpen(false);
+      onOpenChange(false);
       onLoanAdded();
     } catch (error) {
       console.error('Error creating loan:', error);
@@ -125,13 +133,7 @@ const AddLoanDialog: React.FC<AddLoanDialogProps> = ({ onLoanAdded }) => {
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Loan
-        </Button>
-      </DialogTrigger>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create New Loan</DialogTitle>
@@ -139,18 +141,26 @@ const AddLoanDialog: React.FC<AddLoanDialogProps> = ({ onLoanAdded }) => {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label>Customer</Label>
-            <Select value={formData.customerId} onValueChange={(value) => setFormData({ ...formData, customerId: value })}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a customer" />
-              </SelectTrigger>
-              <SelectContent>
-                {customers.map((customer) => (
-                  <SelectItem key={customer.id} value={customer.id}>
-                    {customer.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            {customer ? (
+              <Input
+                value={customer.name}
+                disabled
+                className="bg-muted"
+              />
+            ) : (
+              <Select value={formData.customerId} onValueChange={(value) => setFormData({ ...formData, customerId: value })}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a customer" />
+                </SelectTrigger>
+                <SelectContent>
+                  {customers.map((customer) => (
+                    <SelectItem key={customer.id} value={customer.id}>
+                      {customer.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
           </div>
 
           <div className="space-y-2">

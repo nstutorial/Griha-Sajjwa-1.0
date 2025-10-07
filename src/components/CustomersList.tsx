@@ -5,11 +5,19 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Phone, Trash2, MapPin, Eye, Calendar, Edit } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Phone, Trash2, MapPin, Eye, Calendar, Edit, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useControl } from '@/contexts/ControlContext';
 import CustomerDetails from './CustomerDetails';
 import EditCustomerDialog from './EditCustomerDialog';
+import AddLoanDialog from './AddLoanDialog';
 
 interface Customer {
   id: string;
@@ -38,8 +46,12 @@ const CustomersList = ({ onUpdate }: CustomersListProps) => {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [customerToEdit, setCustomerToEdit] = useState<Customer | null>(null);
+  const [addLoanDialogOpen, setAddLoanDialogOpen] = useState(false);
+  const [customerForLoan, setCustomerForLoan] = useState<Customer | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [allTransactions, setAllTransactions] = useState<any[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState(10);
 
   useEffect(() => {
     if (user) {
@@ -64,7 +76,7 @@ const CustomersList = ({ onUpdate }: CustomersListProps) => {
         .from('customers')
         .select(`
           *,
-          loans (id, principal_amount, is_active, interest_rate, interest_type, loan_date, emi_amount)
+          loans (id, principal_amount, is_active, interest_rate, interest_type, loan_date)
         `)
         .eq('user_id', user?.id)
         .order('created_at', { ascending: false });
@@ -154,6 +166,11 @@ const CustomersList = ({ onUpdate }: CustomersListProps) => {
     setEditDialogOpen(true);
   };
 
+  const handleAddLoan = (customer: Customer) => {
+    setCustomerForLoan(customer);
+    setAddLoanDialogOpen(true);
+  };
+
   const calculateLoanBalance = (loan: any) => {
     const loanTransactions = allTransactions.filter(t => t.loan_id === loan.id);
     const totalPaid = loanTransactions.reduce((sum, t) => sum + t.amount, 0);
@@ -228,6 +245,17 @@ const CustomersList = ({ onUpdate }: CustomersListProps) => {
     );
   });
 
+  // Pagination logic
+  const totalPages = Math.ceil(filteredCustomers.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedCustomers = filteredCustomers.slice(startIndex, endIndex);
+
+  // Reset to first page when search query changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, itemsPerPage]);
+
   if (selectedCustomer) {
     return (
       <CustomerDetails 
@@ -243,13 +271,27 @@ const CustomersList = ({ onUpdate }: CustomersListProps) => {
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-2">
+      <div className="flex gap-2 flex-wrap">
         <Input
           placeholder="Search by name, phone, address, or payment day..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="max-w-md"
         />
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">Show:</span>
+          <Select value={itemsPerPage.toString()} onValueChange={(value) => setItemsPerPage(parseInt(value))}>
+            <SelectTrigger className="w-20">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="5">5</SelectItem>
+              <SelectItem value="10">10</SelectItem>
+              <SelectItem value="20">20</SelectItem>
+              <SelectItem value="50">50</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {filteredCustomers.length === 0 && (
@@ -262,7 +304,7 @@ const CustomersList = ({ onUpdate }: CustomersListProps) => {
         </Card>
       )}
 
-      {filteredCustomers.map((customer) => {
+      {paginatedCustomers.map((customer) => {
         const activeLoans = customer.loans?.filter(loan => loan.is_active) || [];
         const totalLoaned = customer.loans?.reduce((sum, loan) => sum + Number(loan.principal_amount), 0) || 0;
         const outstandingBalance = calculateCustomerOutstanding(customer);
@@ -287,6 +329,14 @@ const CustomersList = ({ onUpdate }: CustomersListProps) => {
                       {activeLoans.length} Active Loan{activeLoans.length > 1 ? 's' : ''}
                     </Badge>
                   )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleAddLoan(customer)}
+                    title="Add Loan"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </Button>
                   <Button
                     variant="outline"
                     size="sm"
@@ -368,6 +418,63 @@ const CustomersList = ({ onUpdate }: CustomersListProps) => {
         );
       })}
 
+      {/* Pagination Controls */}
+      {filteredCustomers.length > 0 && (
+        <div className="flex items-center justify-between">
+          <div className="text-sm text-muted-foreground">
+            Showing {startIndex + 1} to {Math.min(endIndex, filteredCustomers.length)} of {filteredCustomers.length} customers
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+              disabled={currentPage === 1}
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Previous
+            </Button>
+            
+            <div className="flex items-center gap-1">
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                let pageNum;
+                if (totalPages <= 5) {
+                  pageNum = i + 1;
+                } else if (currentPage <= 3) {
+                  pageNum = i + 1;
+                } else if (currentPage >= totalPages - 2) {
+                  pageNum = totalPages - 4 + i;
+                } else {
+                  pageNum = currentPage - 2 + i;
+                }
+                
+                return (
+                  <Button
+                    key={pageNum}
+                    variant={currentPage === pageNum ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setCurrentPage(pageNum)}
+                    className="w-8 h-8 p-0"
+                  >
+                    {pageNum}
+                  </Button>
+                );
+              })}
+            </div>
+            
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+              disabled={currentPage === totalPages}
+            >
+              Next
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Edit Customer Dialog */}
       <EditCustomerDialog
         open={editDialogOpen}
@@ -377,6 +484,20 @@ const CustomersList = ({ onUpdate }: CustomersListProps) => {
         }}
         customer={customerToEdit}
         onCustomerUpdated={() => {
+          fetchCustomers();
+          if (onUpdate) onUpdate();
+        }}
+      />
+
+      {/* Add Loan Dialog */}
+      <AddLoanDialog
+        open={addLoanDialogOpen}
+        onOpenChange={(open) => {
+          setAddLoanDialogOpen(open);
+          if (!open) setCustomerForLoan(null);
+        }}
+        customer={customerForLoan}
+        onLoanAdded={() => {
           fetchCustomers();
           if (onUpdate) onUpdate();
         }}

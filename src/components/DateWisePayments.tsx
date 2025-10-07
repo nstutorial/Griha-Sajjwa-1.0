@@ -344,6 +344,7 @@ const DateWisePayments: React.FC<DateWisePaymentsProps> = ({ onUpdate }) => {
                               </div>
                           </div>
                         </div>
+                        
                         <div className="text-right">
                           <p className="font-medium text-green-600">
                             {formatCurrency(transaction.amount)}

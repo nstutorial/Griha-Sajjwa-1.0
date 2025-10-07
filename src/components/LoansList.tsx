@@ -27,6 +27,7 @@ import { format } from 'date-fns';
 import { saveAs } from 'file-saver';
 import { useControl } from '@/contexts/ControlContext';
 import EditLoanDialog from './EditLoanDialog';
+import AddLoanDialog from './AddLoanDialog';
 
 interface Loan {
   id: string;
@@ -72,6 +73,7 @@ const LoansList: React.FC<LoansListProps> = ({ onUpdate, status = 'active' }) =>
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [showLedgerDialog, setShowLedgerDialog] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [addLoanDialogOpen, setAddLoanDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
   const [paymentData, setPaymentData] = useState({
@@ -570,6 +572,10 @@ Generated on: ${new Date().toLocaleDateString()}
           onChange={(e) => setSearchQuery(e.target.value)}
           className="max-w-md"
         />
+        <Button onClick={() => setAddLoanDialogOpen(true)}>
+          <Plus className="h-4 w-4 mr-2" />
+          Add Loan
+        </Button>
       </div>
 
       {filteredLoans.length === 0 && (
@@ -828,6 +834,16 @@ Generated on: ${new Date().toLocaleDateString()}
         onOpenChange={setEditDialogOpen}
         loan={selectedLoan}
         onLoanUpdated={onUpdate}
+      />
+
+      {/* Add Loan Dialog */}
+      <AddLoanDialog
+        open={addLoanDialogOpen}
+        onOpenChange={setAddLoanDialogOpen}
+        onLoanAdded={() => {
+          fetchLoans();
+          onUpdate();
+        }}
       />
     </div>
   );

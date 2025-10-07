@@ -43,7 +43,7 @@ const Dashboard = () => {
     todaysCollection: 0,
     thisMonthDisbursed: 0,
   });
-  const [activeTab, setActiveTab] = useState('loans');
+  const [activeTab, setActiveTab] = useState('customers');
   const [tabSettings, setTabSettings] = useState<TabSettings>({
     loans: true,
     customers: true,
