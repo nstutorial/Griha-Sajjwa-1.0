@@ -113,6 +113,20 @@ const Settings = () => {
     }
   }, [userRole]);
 
+  // Cleanup effect to clear password verification when navigating away
+  useEffect(() => {
+    return () => {
+      // Clear password verification when component unmounts (navigating away)
+      sessionStorage.removeItem('settingsPasswordVerified');
+    };
+  }, []);
+
+  // Function to handle navigation with cleanup
+  const handleNavigation = (path: string) => {
+    sessionStorage.removeItem('settingsPasswordVerified');
+    navigate(path);
+  };
+
   const fetchUserRole = async () => {
     if (!user) return;
     
@@ -659,7 +673,7 @@ const Settings = () => {
             
             <Button
               variant="outline"
-              onClick={() => navigate('/')}
+              onClick={() => handleNavigation('/')}
               className="w-full"
               disabled={isVerifyingPassword}
             >
@@ -681,7 +695,7 @@ const Settings = () => {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => navigate('/')}
+              onClick={() => handleNavigation('/')}
               className="flex items-center gap-2"
             >
               <ArrowLeft className="h-4 w-4" />
