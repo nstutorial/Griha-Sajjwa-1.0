@@ -162,7 +162,7 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
       if (isInRange) {
         allEntries.push({
           date: transaction.payment_date,
-          description: `Payment Paid - ${transaction.bill.description || 'Bill'} (${transaction.bill.bill_number}) - ${transaction.transaction_type} via ${transaction.payment_mode}`,
+          description: `Paid - ${transaction.bill.description || 'Bill'} (${transaction.bill.bill_number}) - ${transaction.transaction_type} via ${transaction.payment_mode}`,
           reference: transaction.id,
           debit: 0,
           credit: transaction.amount,

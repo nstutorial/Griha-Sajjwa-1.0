@@ -255,6 +255,7 @@ const MahajanList = ({ onUpdate }: MahajanListProps) => {
                     </div>
                   </div>
                   <div className="flex gap-1 ml-2">
+                  {controlSettings.allowEdit && (
                     <Button
                       variant="ghost"
                       size="sm"
@@ -263,6 +264,8 @@ const MahajanList = ({ onUpdate }: MahajanListProps) => {
                     >
                       <Edit className="h-4 w-4" />
                     </Button>
+                     )}
+                      {controlSettings.allowDelete && (
                     <Button
                       variant="ghost"
                       size="sm"
@@ -271,6 +274,7 @@ const MahajanList = ({ onUpdate }: MahajanListProps) => {
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
+                     )}
                   </div>
                 </div>
               </CardHeader>
