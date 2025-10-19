@@ -510,15 +510,15 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
                       </td>
                       <td className="p-3 text-sm text-gray-600">{entry.reference}</td>
                       <td className="p-3 text-right">
-                        {entry.debit > 0 ? (
-                          <span className="text-red-600 font-medium">{formatCurrency(entry.debit)}</span>
+                        {entry.credit > 0 ? (
+                          <span className="text-red-600 font-medium">{formatCurrency(entry.credit)}</span>
                         ) : (
                           <span className="text-gray-400">-</span>
                         )}
                       </td>
                       <td className="p-3 text-right">
-                        {entry.credit > 0 ? (
-                          <span className="text-green-600 font-medium">{formatCurrency(entry.credit)}</span>
+                        {entry.debit > 0 ? (
+                          <span className="text-green-600 font-medium">{formatCurrency(entry.debit)}</span>
                         ) : (
                           <span className="text-gray-400">-</span>
                         )}
