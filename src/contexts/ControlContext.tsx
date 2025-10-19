@@ -12,6 +12,8 @@ export interface ControlSettings {
   allowAddPayment: boolean;
   allowPaymentManager: boolean;
   allowRecordPayment: boolean;
+  allowBillManagement: boolean;
+  allowMahajanDeletion: boolean;
 }
 
 interface ControlContextType {
@@ -34,6 +36,8 @@ export const ControlProvider: React.FC<{ children: React.ReactNode }> = ({ child
     allowAddPayment: true,
     allowPaymentManager: true,
     allowRecordPayment: true,
+    allowBillManagement: true,
+    allowMahajanDeletion: true,
   });
   const [loading, setLoading] = useState(false);
 
@@ -49,6 +53,8 @@ export const ControlProvider: React.FC<{ children: React.ReactNode }> = ({ child
         allowAddPayment: true,
         allowPaymentManager: true,
         allowRecordPayment: true,
+        allowBillManagement: true,
+        allowMahajanDeletion: true,
       });
       return;
     }

@@ -22,11 +22,11 @@ import {
 import { Plus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
-interface AddCustomerDialogProps {
-  onCustomerAdded?: () => void;
+interface AddMahajanDialogProps {
+  onMahajanAdded?: () => void;
 }
 
-const AddCustomerDialog = ({ onCustomerAdded }: AddCustomerDialogProps) => {
+const AddMahajanDialog = ({ onMahajanAdded }: AddMahajanDialogProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
@@ -48,7 +48,7 @@ const AddCustomerDialog = ({ onCustomerAdded }: AddCustomerDialogProps) => {
       toast({
         variant: "destructive",
         title: "Validation Error",
-        description: "Customer name is required.",
+        description: "Mahajan name is required.",
       });
       return;
     }
@@ -83,7 +83,7 @@ const AddCustomerDialog = ({ onCustomerAdded }: AddCustomerDialogProps) => {
     setLoading(true);
     try {
       const { error } = await supabase
-        .from('customers')
+        .from('mahajans')
         .insert({
           user_id: user.id,
           name: formData.name.trim(),
@@ -95,8 +95,8 @@ const AddCustomerDialog = ({ onCustomerAdded }: AddCustomerDialogProps) => {
       if (error) throw error;
 
       toast({
-        title: "Customer added",
-        description: "The customer has been successfully added.",
+        title: "Mahajan added",
+        description: "The mahajan has been successfully added.",
       });
 
       setFormData({
@@ -107,13 +107,13 @@ const AddCustomerDialog = ({ onCustomerAdded }: AddCustomerDialogProps) => {
       });
       
       setOpen(false);
-      if (onCustomerAdded) onCustomerAdded();
+      if (onMahajanAdded) onMahajanAdded();
     } catch (error) {
-      console.error('Error adding customer:', error);
+      console.error('Error adding mahajan:', error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to add customer. Please try again.",
+        description: "Failed to add mahajan. Please try again.",
       });
     } finally {
       setLoading(false);
@@ -125,12 +125,12 @@ const AddCustomerDialog = ({ onCustomerAdded }: AddCustomerDialogProps) => {
       <DialogTrigger asChild>
         <Button>
           <Plus className="h-4 w-4 mr-2" />
-          Add Customer
+          Add Mahajan
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Add New Customer</DialogTitle>
+          <DialogTitle>Add New Mahajan</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
@@ -138,7 +138,7 @@ const AddCustomerDialog = ({ onCustomerAdded }: AddCustomerDialogProps) => {
             <Input
               id="name"
               type="text"
-              placeholder="Enter customer name"
+              placeholder="Enter mahajan name"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               required
@@ -161,7 +161,7 @@ const AddCustomerDialog = ({ onCustomerAdded }: AddCustomerDialogProps) => {
             <Label htmlFor="address">Group Name *</Label>
             <Textarea
               id="address"
-              placeholder="Enter customer address"
+              placeholder="Enter mahajan address"
               value={formData.address}
               onChange={(e) => setFormData({ ...formData, address: e.target.value })}
               required
@@ -195,7 +195,7 @@ const AddCustomerDialog = ({ onCustomerAdded }: AddCustomerDialogProps) => {
           </div>
           
           <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? 'Adding...' : 'Add Customer'}
+            {loading ? 'Adding...' : 'Add Mahajan'}
           </Button>
         </form>
       </DialogContent>
@@ -203,4 +203,4 @@ const AddCustomerDialog = ({ onCustomerAdded }: AddCustomerDialogProps) => {
   );
 };
 
-export default AddCustomerDialog;
+export default AddMahajanDialog;

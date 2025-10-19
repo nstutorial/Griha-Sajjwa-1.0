@@ -12,7 +12,8 @@ import {
   TrendingUp, 
   Users, 
   DollarSign,
-  LogOut
+  LogOut,
+  Plus
 } from 'lucide-react';
 import LoansList from '@/components/LoansList';
 import AddLoanDialog from '@/components/AddLoanDialog';
@@ -22,6 +23,9 @@ import CustomerSummary from '@/components/CustomerSummary';
 import DaywiseCustomerManager from '@/components/DaywiseCustomerManager';
 import DaywisePayment from '@/components/DaywisePayment';
 import DateWisePayments from '@/components/DateWisePayments';
+import MahajanList from '@/components/MahajanList';
+import AddMahajanDialog from '@/components/AddMahajanDialog';
+import MahajanSummary from '@/components/MahajanSummary';
 import { TabSettings } from '@/pages/Settings';
 import { useToast } from '@/hooks/use-toast';
 import LoadingSpinner from '@/components/LoadingSpinner';
@@ -43,10 +47,12 @@ const Dashboard = () => {
     todaysCollection: 0,
     thisMonthDisbursed: 0,
   });
+  const [addLoanDialogOpen, setAddLoanDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('customers');
   const [tabSettings, setTabSettings] = useState<TabSettings>({
     loans: true,
     customers: true,
+    mahajans: true,
     daywise: true,
     payments: true,
   });
@@ -68,12 +74,19 @@ const Dashboard = () => {
       }
 
       if (data) {
-        setTabSettings(data.visible_tabs as unknown as TabSettings);
+        const settings = data.visible_tabs as unknown as TabSettings;
+        // Ensure mahajans field exists, default to true if missing
+        const settingsWithMahajans = {
+          ...settings,
+          mahajans: settings.mahajans !== undefined ? settings.mahajans : true
+        };
+        setTabSettings(settingsWithMahajans);
       } else {
         // If no settings exist, create default settings
         const defaultSettings = {
           loans: true,
           customers: true,
+          mahajans: true,
           daywise: true,
           payments: true,
         };
@@ -257,7 +270,8 @@ const Dashboard = () => {
               <TabsList className="grid w-full min-w-max" style={{ gridTemplateColumns: `repeat(${Object.values(tabSettings).filter(Boolean).length}, 1fr)` }}>
                 {tabSettings.loans && <TabsTrigger value="loans" className="text-xs sm:text-sm">Loans</TabsTrigger>}
                 {tabSettings.customers && <TabsTrigger value="customers" className="text-xs sm:text-sm">Customers</TabsTrigger>}
-                {tabSettings.daywise && <TabsTrigger value="daywise" className="text-xs sm:text-sm">Daywise</TabsTrigger>}
+                {tabSettings.mahajans && <TabsTrigger value="mahajans" className="text-xs sm:text-sm">Mahajans</TabsTrigger>}
+                {tabSettings.daywise && <TabsTrigger value="daywise" className="text-xs sm:text-sm">Collection</TabsTrigger>}
                 {tabSettings.payments && <TabsTrigger value="payments" className="text-xs sm:text-sm">Payments</TabsTrigger>}
               </TabsList>
             </div>
@@ -267,10 +281,10 @@ const Dashboard = () => {
                 <div className="space-y-4">
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0">
                     <h2 className="text-lg sm:text-xl font-semibold">Loans & Lending</h2>
-                    <AddLoanDialog onLoanAdded={() => {
-                      fetchStats();
-                      window.dispatchEvent(new CustomEvent('refresh-loans'));
-                    }} />
+                    <Button onClick={() => setAddLoanDialogOpen(true)}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Add Loan
+                    </Button>
                   </div>
                   
                   {/* Sub-tabs for Loans */}
@@ -329,6 +343,45 @@ const Dashboard = () => {
               </TabsContent>
             )}
 
+            {tabSettings.mahajans && (
+              <TabsContent value="mahajans" className="space-y-4 mt-4">
+                <div className="space-y-4">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0">
+                    <h2 className="text-lg sm:text-xl font-semibold">Mahajans</h2>
+                    <AddMahajanDialog onMahajanAdded={() => {
+                      // Trigger refresh for any components that need it
+                      window.dispatchEvent(new CustomEvent('refresh-mahajans'));
+                    }} />
+                  </div>
+                  
+                  {/* Sub-tabs for Mahajans */}
+                  <Tabs defaultValue="list" className="w-full">
+                    <TabsList className={`grid ${controlSettings.allowPaymentManager ? 'grid-cols-2' : 'grid-cols-2'}`}>
+                      <TabsTrigger value="list" className="text-xs sm:text-sm">Mahajan List</TabsTrigger>
+                      <TabsTrigger value="summary" className="text-xs sm:text-sm">Summary Report</TabsTrigger>
+                      {/* {controlSettings.allowPaymentManager && (
+                        <TabsTrigger value="payment-manager" className="text-xs sm:text-sm">
+                          <span className="hidden sm:inline">Payment Manager</span>
+                          <span className="sm:hidden">Payments</span>
+                        </TabsTrigger>
+                      )} */}
+                    </TabsList>
+                    <TabsContent value="list" className="mt-4">
+                      <MahajanList onUpdate={fetchStats} />
+                    </TabsContent>
+                    <TabsContent value="summary" className="mt-4">
+                      <MahajanSummary />
+                    </TabsContent>
+                    {controlSettings.allowPaymentManager && (
+                      <TabsContent value="payment-manager" className="mt-4">
+                        <DaywiseCustomerManager />
+                      </TabsContent>
+                    )}
+                  </Tabs>
+                </div>
+              </TabsContent>
+            )}
+
             {tabSettings.daywise && (
               <TabsContent value="daywise" className="space-y-4 mt-4">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0">
@@ -353,6 +406,15 @@ const Dashboard = () => {
         </div>
       </div>
 
+      {/* Add Loan Dialog */}
+      <AddLoanDialog
+        open={addLoanDialogOpen}
+        onOpenChange={setAddLoanDialogOpen}
+        onLoanAdded={() => {
+          fetchStats();
+          window.dispatchEvent(new CustomEvent('refresh-loans'));
+        }}
+      />
     </div>
     </SidebarProvider>
   );

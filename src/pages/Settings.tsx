@@ -10,12 +10,13 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Settings as SettingsIcon, Mail, Edit3, Shield, Lock } from 'lucide-react';
+import { ArrowLeft, Settings as SettingsIcon, Mail, Edit3, Shield, Lock, BarChart3 } from 'lucide-react';
 import { useControl } from '@/contexts/ControlContext';
 
 export interface TabSettings {
   loans: boolean;
   customers: boolean;
+  mahajans: boolean;
   daywise: boolean;
   payments: boolean;
 }
@@ -31,6 +32,8 @@ export interface ControlSettings {
   allowPaymentManager: boolean;
   allowRecordPayment: boolean;
   allowEmailChange: boolean;
+  allowBillManagement: boolean;
+  allowMahajanDeletion: boolean;
 }
 
 const Settings = () => {
@@ -41,6 +44,7 @@ const Settings = () => {
   const [settings, setSettings] = useState<TabSettings>({
     loans: true,
     customers: true,
+    mahajans: true,
     daywise: true,
     payments: true,
   });
@@ -55,6 +59,8 @@ const Settings = () => {
     allowPaymentManager: true,
     allowRecordPayment: true,
     allowEmailChange: true,
+    allowBillManagement: true,
+    allowMahajanDeletion: true,
   });
   const [isUpdating, setIsUpdating] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -272,7 +278,12 @@ const Settings = () => {
 
       if (data) {
         const settings = (data as any)?.visible_tabs as unknown as TabSettings;
-        setSettings(settings);
+        // Ensure mahajans field exists, default to true if missing
+        const settingsWithMahajans = {
+          ...settings,
+          mahajans: settings.mahajans !== undefined ? settings.mahajans : true
+        };
+        setSettings(settingsWithMahajans);
         
         // Try to load control settings from database
         const defaultControlSettings = {
@@ -286,6 +297,8 @@ const Settings = () => {
           allowPaymentManager: true,
           allowRecordPayment: true,
           allowEmailChange: true,
+          allowBillManagement: true,
+          allowMahajanDeletion: true,
         };
         
         if ((data as any)?.control_settings) {
@@ -304,6 +317,7 @@ const Settings = () => {
         const defaultSettings = {
           loans: true,
           customers: true,
+          mahajans: true,
           daywise: true,
           payments: true,
         };
@@ -319,6 +333,8 @@ const Settings = () => {
           allowPaymentManager: true,
           allowRecordPayment: true,
           allowEmailChange: true,
+          allowBillManagement: true,
+          allowMahajanDeletion: true,
         };
         
         setSettings(defaultSettings);
@@ -571,6 +587,7 @@ const Settings = () => {
     const defaultSettings = {
       loans: true,
       customers: true,
+      mahajans: true,
       daywise: true,
       payments: true,
     };
@@ -586,6 +603,8 @@ const Settings = () => {
       allowPaymentManager: true,
       allowRecordPayment: true,
       allowEmailChange: true,
+      allowBillManagement: true,
+      allowMahajanDeletion: true,
     };
 
     setSettings(defaultSettings);
@@ -702,15 +721,17 @@ const Settings = () => {
               Back to Dashboard
             </Button>
             {userRole === 'admin' && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => navigate('/password-management')}
-                className="flex items-center gap-2"
-              >
-                <Lock className="h-4 w-4" />
-                Manage Access Password
-              </Button>
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate('/password-management')}
+                  className="flex items-center gap-2"
+                >
+                  <Lock className="h-4 w-4" />
+                  Manage Access Password
+                </Button>
+              </>
             )}
           </div>
           
@@ -886,6 +907,7 @@ const Settings = () => {
                       <p className="text-sm text-muted-foreground">
                         {key === 'loans' && 'Manage loans and repayments'}
                         {key === 'customers' && 'Customer management and details'}
+                        {key === 'mahajans' && 'Mahajan management and bill tracking'}
                         {key === 'daywise' && 'Daily payment schedule overview'}
                         {key === 'payments' && 'Payment history and tracking'}
                       </p>
@@ -939,6 +961,8 @@ const Settings = () => {
                         {key === 'allowPaymentManager' && 'Payment Manager Tab'}
                         {key === 'allowRecordPayment' && 'Record Payment Button'}
                         {key === 'allowEmailChange' && 'Email Change Permission'}
+                        {key === 'allowBillManagement' && 'Bill Management Operations'}
+                        {key === 'allowMahajanDeletion' && 'Mahajan Deletion Permission'}
                       </Label>
                       <p className="text-sm text-muted-foreground">
                         {key === 'allowEdit' && 'Show/hide edit buttons and modify forms throughout the app'}
@@ -951,6 +975,8 @@ const Settings = () => {
                         {key === 'allowPaymentManager' && 'Show/hide Payment Manager tab in Customers section'}
                         {key === 'allowRecordPayment' && 'Show/hide Record Payment button in loan details and payment dialogs'}
                         {key === 'allowEmailChange' && 'Enable/disable email change functionality for users'}
+                        {key === 'allowBillManagement' && 'Show/hide bill management features in Mahajan section'}
+                        {key === 'allowMahajanDeletion' && 'Enable/disable mahajan deletion functionality'}
                       </p>
                     </div>
                     <Switch

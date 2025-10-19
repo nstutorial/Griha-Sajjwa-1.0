@@ -21,60 +21,58 @@ import {
 import { Plus } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
-interface Customer {
+interface Mahajan {
   id: string;
   name: string;
 }
 
-interface AddLoanDialogProps {
+interface AddBillDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  customer?: Customer | null;
-  onLoanAdded: () => void;
+  mahajan?: Mahajan | null;
+  onBillAdded: () => void;
 }
 
-const AddLoanDialog: React.FC<AddLoanDialogProps> = ({ open, onOpenChange, customer, onLoanAdded }) => {
+const AddBillDialog: React.FC<AddBillDialogProps> = ({ open, onOpenChange, mahajan, onBillAdded }) => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [mahajans, setMahajans] = useState<Mahajan[]>([]);
   const [loading, setLoading] = useState(false);
   
   const [formData, setFormData] = useState({
-    customerId: '',
-    principalAmount: '',
+    mahajanId: '',
+    billAmount: '',
     description: '',
     interestRate: '',
     interestType: 'none' as 'daily' | 'monthly' | 'none',
-    emiAmount: '',
-    emiFrequency: 'weekly' as 'weekly' | 'monthly',
-    loanDate: new Date().toISOString().split('T')[0],
+    billDate: new Date().toISOString().split('T')[0],
     dueDate: '',
   });
 
   useEffect(() => {
     if (user && open) {
-      fetchCustomers();
+      fetchMahajans();
     }
   }, [user, open]);
 
   useEffect(() => {
-    if (customer && open) {
-      setFormData(prev => ({ ...prev, customerId: customer.id }));
+    if (mahajan && open) {
+      setFormData(prev => ({ ...prev, mahajanId: mahajan.id }));
     }
-  }, [customer, open]);
+  }, [mahajan, open]);
 
-  const fetchCustomers = async () => {
+  const fetchMahajans = async () => {
     try {
       const { data, error } = await supabase
-        .from('customers')
+        .from('mahajans')
         .select('id, name')
         .eq('user_id', user?.id)
         .order('name');
 
       if (error) throw error;
-      setCustomers(data || []);
+      setMahajans(data || []);
     } catch (error) {
-      console.error('Error fetching customers:', error);
+      console.error('Error fetching mahajans:', error);
     }
   };
 
@@ -82,50 +80,58 @@ const AddLoanDialog: React.FC<AddLoanDialogProps> = ({ open, onOpenChange, custo
     e.preventDefault();
     if (!user) return;
 
+    // Use mahajan.id if mahajan is provided, otherwise use formData.mahajanId
+    const mahajanId = mahajan?.id || formData.mahajanId;
+    
+    if (!mahajanId) {
+      toast({
+        variant: "destructive",
+        title: "Validation Error",
+        description: "Please select a mahajan.",
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       const { error } = await supabase
-        .from('loans')
+        .from('bills')
         .insert({
           user_id: user.id,
-          customer_id: formData.customerId,
-          principal_amount: parseFloat(formData.principalAmount),
+          mahajan_id: mahajanId,
+          bill_amount: parseFloat(formData.billAmount),
           description: formData.description,
           interest_rate: formData.interestType === 'none' ? 0 : parseFloat(formData.interestRate),
           interest_type: formData.interestType,
-          emi_amount: formData.emiAmount ? parseFloat(formData.emiAmount) : null,
-          emi_frequency: formData.emiFrequency,
-          loan_date: formData.loanDate,
+          bill_date: formData.billDate,
           due_date: formData.dueDate || null,
         });
 
       if (error) throw error;
 
       toast({
-        title: "Loan created",
-        description: "The loan has been successfully created.",
+        title: "Bill added",
+        description: "The bill has been successfully added.",
       });
 
       setFormData({
-        customerId: '',
-        principalAmount: '',
+        mahajanId: mahajan?.id || '',
+        billAmount: '',
         description: '',
         interestRate: '',
         interestType: 'none',
-        emiAmount: '',
-        emiFrequency: 'weekly',
-        loanDate: new Date().toISOString().split('T')[0],
+        billDate: new Date().toISOString().split('T')[0],
         dueDate: '',
       });
       
       onOpenChange(false);
-      onLoanAdded();
+      onBillAdded();
     } catch (error) {
-      console.error('Error creating loan:', error);
+      console.error('Error adding bill:', error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to create loan. Please try again.",
+        description: "Failed to add bill. Please try again.",
       });
     } finally {
       setLoading(false);
@@ -134,28 +140,30 @@ const AddLoanDialog: React.FC<AddLoanDialogProps> = ({ open, onOpenChange, custo
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px] max-h-[80vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Create New Loan</DialogTitle>
+          <DialogTitle>Add New Bill</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label>Customer</Label>
-            {customer ? (
-              <Input
-                value={customer.name}
-                disabled
-                className="bg-muted"
-              />
+            <Label htmlFor="mahajan">Mahajan *</Label>
+            {mahajan ? (
+              <div className="p-3 border rounded-md bg-gray-50">
+                <div className="text-sm font-medium">{mahajan.name}</div>               
+              </div>
             ) : (
-              <Select value={formData.customerId} onValueChange={(value) => setFormData({ ...formData, customerId: value })}>
+              <Select 
+                value={formData.mahajanId} 
+                onValueChange={(value) => setFormData({ ...formData, mahajanId: value })}
+                required
+              >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select a customer" />
+                  <SelectValue placeholder="Select mahajan" />
                 </SelectTrigger>
                 <SelectContent>
-                  {customers.map((customer) => (
-                    <SelectItem key={customer.id} value={customer.id}>
-                      {customer.name}
+                  {mahajans.map((mahajan) => (
+                    <SelectItem key={mahajan.id} value={mahajan.id}>
+                      {mahajan.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -164,34 +172,37 @@ const AddLoanDialog: React.FC<AddLoanDialogProps> = ({ open, onOpenChange, custo
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="principal">Total Disbursed Amount (₹)</Label>
+            <Label htmlFor="billAmount">Bill Amount *</Label>
             <Input
-              id="principal"
+              id="billAmount"
               type="number"
               step="0.01"
-              placeholder="Enter loan amount"
-              value={formData.principalAmount}
-              onChange={(e) => setFormData({ ...formData, principalAmount: e.target.value })}
+              placeholder="Enter bill amount"
+              value={formData.billAmount}
+              onChange={(e) => setFormData({ ...formData, billAmount: e.target.value })}
               required
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="description">Loan Description</Label>
+            <Label htmlFor="description">Description *</Label>
             <Input
               id="description"
               type="text"
-              placeholder="Enter loan description"
+              placeholder="Enter bill description"
               value={formData.description}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              required
             />
           </div>
 
           <div className="space-y-2">
             <Label>Interest Type</Label>
-            <Select disabled={true}
+            <Select 
               value={formData.interestType} 
-              onValueChange={(value: 'daily' | 'monthly' | 'none') => setFormData({ ...formData, interestType: value })}
+              onValueChange={(value: 'daily' | 'monthly' | 'none') => 
+                setFormData({ ...formData, interestType: value })
+              }
             >
               <SelectTrigger>
                 <SelectValue />
@@ -206,9 +217,9 @@ const AddLoanDialog: React.FC<AddLoanDialogProps> = ({ open, onOpenChange, custo
 
           {formData.interestType !== 'none' && (
             <div className="space-y-2">
-              <Label htmlFor="interest-rate">Interest Rate (%)</Label>
+              <Label htmlFor="interestRate">Interest Rate (%) *</Label>
               <Input
-                id="interest-rate"
+                id="interestRate"
                 type="number"
                 step="0.01"
                 placeholder="Enter interest rate"
@@ -220,57 +231,32 @@ const AddLoanDialog: React.FC<AddLoanDialogProps> = ({ open, onOpenChange, custo
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="emi-amount">EMI Amount (₹)</Label>
+            <Label htmlFor="billDate">Bill Date *</Label>
             <Input
-              id="emi-amount"
-              type="number"
-              step="0.01"
-              placeholder="Enter EMI amount"
-              value={formData.emiAmount}
-              onChange={(e) => setFormData({ ...formData, emiAmount: e.target.value })}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label>EMI Frequency</Label>
-            <Select 
-              value={formData.emiFrequency} 
-              onValueChange={(value: 'weekly' | 'monthly') => setFormData({ ...formData, emiFrequency: value })}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="weekly">Weekly</SelectItem>
-                <SelectItem value="monthly">Monthly</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="loan-date">Loan Date</Label>
-            <Input
-              id="loan-date"
+              id="billDate"
               type="date"
-              value={formData.loanDate}
-              onChange={(e) => setFormData({ ...formData, loanDate: e.target.value })}
+              value={formData.billDate}
+              onChange={(e) => setFormData({ ...formData, billDate: e.target.value })}
               required
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="due-date">1st EMI Due Date </Label>
+            <Label htmlFor="dueDate">Due Date</Label>
             <Input
-              id="due-date"
+              id="dueDate"
               type="date"
               value={formData.dueDate}
               onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-              required
             />
           </div>
 
+          <div className="text-sm text-muted-foreground">
+            * Required fields
+          </div>
+          
           <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? 'Creating...' : 'Create Loan'}
+            {loading ? 'Adding...' : 'Add Bill'}
           </Button>
         </form>
       </DialogContent>
@@ -278,4 +264,4 @@ const AddLoanDialog: React.FC<AddLoanDialogProps> = ({ open, onOpenChange, custo
   );
 };
 
-export default AddLoanDialog;
+export default AddBillDialog;
