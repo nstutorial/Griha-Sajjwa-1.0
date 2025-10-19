@@ -169,7 +169,7 @@ const AddMahajanDialog = ({ onMahajanAdded }: AddMahajanDialogProps) => {
           </div>
 
           <div className="space-y-2">
-            <Label>Collection Day *</Label>
+            <Label>Payment Day *</Label>
             <Select 
               value={formData.payment_day} 
               onValueChange={(value: string) => setFormData({ ...formData, payment_day: value })}
