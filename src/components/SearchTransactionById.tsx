@@ -165,9 +165,12 @@ const SearchTransactionById = ({ transactions }: { transactions: Transaction[] }
       {/* ✏️ Edit Modal */}
       <Dialog open={!!editTransaction} onOpenChange={() => setEditTransaction(null)}>
         <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit Transaction</DialogTitle>
-          </DialogHeader>
+         <DialogHeader>
+    <DialogTitle>Edit Transaction</DialogTitle>
+    <DialogDescription>
+      Update the details of this transaction and save changes.
+    </DialogDescription>
+  </DialogHeader>
 
           {editTransaction && (
             <div className="space-y-4">
