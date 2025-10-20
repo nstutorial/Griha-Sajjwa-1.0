@@ -26,6 +26,7 @@ import { ArrowLeft, Plus, IndianRupee, FileText } from 'lucide-react';
 import MahajanStatement from './MahajanStatement';
 import AddBillDialog from './AddBillDialog';
 import SearchBillbyRef from './SearchBillbyRef';
+import SearchTransactionById from './SearchTransactionById';
 
 interface Mahajan {
   id: string;
@@ -397,6 +398,10 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
 
         <TabsContent value="search">
           <SearchBillbyRef bills={bills} />
+        </TabsContent>
+
+        <TabsContent value="search">
+          <SearchTransactionById transactions={transactions} />
         </TabsContent>
       </Tabs>
 
