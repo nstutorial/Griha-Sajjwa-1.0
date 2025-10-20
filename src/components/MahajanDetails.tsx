@@ -25,6 +25,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ArrowLeft, Plus, IndianRupee, FileText } from 'lucide-react';
 import MahajanStatement from './MahajanStatement';
 import AddBillDialog from './AddBillDialog';
+import SearchBillbyRef from './SearchBillbyRef';
 
 interface Mahajan {
   id: string;
@@ -308,9 +309,11 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
 
       {/* Tabs */}
       <Tabs defaultValue="bills" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="bills">Bills</TabsTrigger>
           <TabsTrigger value="statement">Statement</TabsTrigger>
+          <TabsTrigger value="search">Search Bill</TabsTrigger>
+
         </TabsList>
         
         <TabsContent value="bills" className="space-y-4">
@@ -390,6 +393,10 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
         
         <TabsContent value="statement">
           <MahajanStatement mahajan={mahajan} />
+        </TabsContent>
+
+        <TabsContent value="search">
+          <SearchBillbyRef bills={bills} />
         </TabsContent>
       </Tabs>
 
