@@ -54,7 +54,7 @@ const SearchTransactionById = ({ transactions }: { transactions: Transaction[] }
           payment_date: editTransaction.payment_date,
           payment_mode: editTransaction.payment_mode,
           notes: editTransaction.notes,
-          updated_at: new Date().toISOString(),
+          // updated_at: new Date().toISOString(),
         })
         .eq('id', editTransaction.id);
 
