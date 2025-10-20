@@ -310,10 +310,11 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
 
       {/* Tabs */}
       <Tabs defaultValue="bills" className="w-full">
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="bills">Bills</TabsTrigger>
           <TabsTrigger value="statement">Statement</TabsTrigger>
           <TabsTrigger value="search">Search Bill</TabsTrigger>
+          <TabsTrigger value="search">Search Transaction</TabsTrigger>
 
         </TabsList>
         
