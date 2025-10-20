@@ -23,7 +23,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft, Plus, IndianRupee, FileText } from 'lucide-react';
+import { ArrowLeft, Plus } from 'lucide-react';
 import MahajanStatement from './MahajanStatement';
 import AddBillDialog from './AddBillDialog';
 import SearchBillbyRef from './SearchBillbyRef';
@@ -78,7 +78,7 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
   const [selectedBillId, setSelectedBillId] = useState('');
   const [loading, setLoading] = useState(false);
   const [addBillDialogOpen, setAddBillDialogOpen] = useState(false);
-  
+
   const [paymentData, setPaymentData] = useState({
     amount: '',
     paymentType: 'principal' as 'principal' | 'interest' | 'mixed',
@@ -86,16 +86,14 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
     payment_mode: 'cash' as 'cash' | 'bank',
   });
 
+  // Fetch bills on mount
   useEffect(() => {
-    if (user) {
-      fetchBills();
-    }
+    if (user) fetchBills();
   }, [user, mahajan.id]);
 
+  // Fetch transactions when bills update
   useEffect(() => {
-    if (user && bills.length > 0) {
-      fetchTransactions();
-    }
+    if (user && bills.length > 0) fetchTransactions();
   }, [user, bills]);
 
   const fetchBills = async () => {
@@ -123,10 +121,7 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
     try {
       const { data, error } = await supabase
         .from('bill_transactions')
-        .select(`
-          *,
-          bill:bills(description, bill_amount)
-        `)
+        .select(`*, bill:bills(description, bill_amount)`)
         .in('bill_id', bills.map(b => b.id))
         .order('payment_date', { ascending: false });
 
@@ -151,24 +146,24 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
 
   const calculateInterest = (bill: Bill, balance: number) => {
     if (!bill.interest_rate || bill.interest_type === 'none') return 0;
-    
+
     const rate = bill.interest_rate / 100;
     const startDate = new Date(bill.bill_date);
     const endDate = new Date();
-    
+
+    let interest = 0;
+
     if (bill.interest_type === 'daily') {
-      const timeDiff = endDate.getTime() - startDate.getTime();
-      const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
-      return balance * rate * (daysDiff / 365);
+      const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24));
+      interest = balance * rate * (daysDiff / 365);
     } else if (bill.interest_type === 'monthly') {
-      const months = (endDate.getFullYear() - startDate.getFullYear()) * 12 + 
+      const months = (endDate.getFullYear() - startDate.getFullYear()) * 12 +
                      (endDate.getMonth() - startDate.getMonth());
       const daysInMonth = (endDate.getDate() - startDate.getDate()) / 30;
-      const totalMonths = months + daysInMonth;
-      return balance * rate * totalMonths;
+      interest = balance * rate * (months + daysInMonth);
     }
-    
-    return 0;
+
+    return Math.round(interest * 100) / 100; // round to 2 decimals
   };
 
   const calculateTotalOutstanding = () => {
@@ -200,7 +195,7 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
         .from('bill_transactions')
         .insert({
           bill_id: selectedBillId,
-          amount: amount,
+          amount,
           transaction_type: paymentData.paymentType,
           payment_mode: paymentData.payment_mode,
           notes: paymentData.notes || null,
@@ -221,7 +216,7 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
       });
       setShowPaymentDialog(false);
       setSelectedBillId('');
-      
+
       fetchTransactions();
       if (onUpdate) onUpdate();
     } catch (error) {
@@ -236,16 +231,11 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
     }
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-    }).format(amount);
-  };
+  const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(amount);
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-IN');
-  };
+  const formatDate = (dateString: string) =>
+    new Date(dateString).toLocaleDateString('en-IN');
 
   return (
     <div className="space-y-6">
@@ -270,10 +260,7 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
               <Plus className="h-4 w-4 mr-2" />
               Add Bill
             </Button>
-            <Button onClick={() => {
-              setSelectedBillId('');
-              setShowPaymentDialog(true);
-            }}>
+            <Button onClick={() => setShowPaymentDialog(true)}>
               <Plus className="h-4 w-4 mr-2" />
               Record Payment
             </Button>
@@ -314,13 +301,11 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="bills">Bills</TabsTrigger>
           <TabsTrigger value="statement">Statement</TabsTrigger>
-          <TabsTrigger value="search">Search Bill</TabsTrigger>
-          <TabsTrigger value="search">Search Transaction</TabsTrigger>
-
+          <TabsTrigger value="searchBill">Search Bill</TabsTrigger>
+          <TabsTrigger value="searchTransaction">Search Transaction</TabsTrigger>
         </TabsList>
-        
+
         <TabsContent value="bills" className="space-y-4">
-          {/* Bills List */}
           <Card>
             <CardHeader>
               <CardTitle>Bills</CardTitle>
@@ -336,7 +321,7 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
                     const balance = calculateBillBalance(bill.id);
                     const interest = calculateInterest(bill, balance);
                     const totalOutstanding = balance + interest;
-                    
+
                     return (
                       <div key={bill.id} className="border rounded-lg p-4">
                         <div className="flex items-start justify-between">
@@ -393,16 +378,16 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
             </CardContent>
           </Card>
         </TabsContent>
-        
+
         <TabsContent value="statement">
           <MahajanStatement mahajan={mahajan} />
         </TabsContent>
 
-        <TabsContent value="search">
+        <TabsContent value="searchBill">
           <SearchBillbyRef bills={bills} />
         </TabsContent>
 
-        <TabsContent value="search">
+        <TabsContent value="searchTransaction">
           <SearchTransactionById transactions={transactions} />
         </TabsContent>
       </Tabs>
