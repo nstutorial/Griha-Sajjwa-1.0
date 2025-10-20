@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from './ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from './ui/dialog';
 import { Label } from './ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
