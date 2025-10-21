@@ -65,6 +65,13 @@ const SearchTransactionById = ({ transactions }: { transactions: Transaction[] }
       );
       setEditTransaction(null);
       toast.success('Transaction updated successfully');
+
+      // Notify other components (MahajanList) to refresh balances / data
+      try {
+        window.dispatchEvent(new Event('refresh-mahajans'));
+      } catch {
+        // no-op in non-browser environments
+      }
     } catch (error: any) {
       toast.error(error.message || 'Failed to update transaction');
     }

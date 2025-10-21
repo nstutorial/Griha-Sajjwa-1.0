@@ -59,6 +59,13 @@ const SearchBillbyRef = ({ bills }: { bills: Bill[] }) => {
 
       setFilteredBills((prev) => prev.filter((b) => b.id !== id));
       toast.success('Bill deleted successfully');
+
+      // notify mahajan list to refresh data/balances
+      try {
+        window.dispatchEvent(new Event('refresh-mahajans'));
+      } catch {
+        // noop for non-browser envs
+      }
     } catch (error: any) {
       toast.error(error.message || 'Failed to delete bill');
     }
@@ -88,6 +95,13 @@ const SearchBillbyRef = ({ bills }: { bills: Bill[] }) => {
       );
       setEditBill(null);
       toast.success('Bill updated successfully');
+
+      // notify mahajan list to refresh data/balances
+      try {
+        window.dispatchEvent(new Event('refresh-mahajans'));
+      } catch {
+        // noop for non-browser envs
+      }
     } catch (error: any) {
       toast.error(error.message || 'Failed to update bill');
     }
