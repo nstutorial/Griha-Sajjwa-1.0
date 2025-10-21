@@ -54,7 +54,7 @@ interface BillTransaction {
   amount: number;
   payment_date: string;
   transaction_type: string;
-  payment_mode: 'cash' | 'bank';
+  payment_mode: string;
   notes: string | null;
   bill: {
     description: string | null;
@@ -86,54 +86,57 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
     payment_mode: 'cash' as 'cash' | 'bank',
   });
 
-  // Fetch bills on mount
+  // Fetch bills and transactions together to prevent flickering
   useEffect(() => {
-    if (user) fetchBills();
+    if (user) fetchBillsAndTransactions();
   }, [user, mahajan.id]);
 
-  // Fetch transactions when bills update
+  // Listen for refresh events (when bills/transactions are edited)
   useEffect(() => {
-    if (user && bills.length > 0) fetchTransactions();
-  }, [user, bills]);
+    const handleRefresh = () => {
+      fetchBillsAndTransactions();
+    };
 
-  const fetchBills = async () => {
+    window.addEventListener('refresh-mahajans', handleRefresh);
+    return () => window.removeEventListener('refresh-mahajans', handleRefresh);
+  }, [user, mahajan.id]);
+
+  const fetchBillsAndTransactions = async () => {
     try {
-      const { data, error } = await supabase
+      setLoading(true);
+      const { data: billsData, error: billsError } = await supabase
         .from('bills')
         .select('*')
         .eq('mahajan_id', mahajan.id)
         .eq('user_id', user?.id)
         .order('bill_date', { ascending: false });
 
-      if (error) throw error;
-      setBills(data || []);
-    } catch (error) {
-      console.error('Error fetching bills:', error);
+      if (billsError) throw billsError;
+
+      let transData: any[] = [];
+      if (billsData && billsData.length > 0) {
+        const { data: transactions, error: transError } = await supabase
+          .from('bill_transactions')
+          .select(`*, bill:bills(description, bill_amount)`)
+          .in('bill_id', billsData.map(b => b.id))
+          .order('payment_date', { ascending: false });
+
+        if (transError) throw transError;
+        transData = transactions || [];
+      }
+
+      // Set both states together to prevent flickering
+      setTransactions(transData);
+      setBills(billsData || []);
+    } catch (error: any) {
+      console.error('Error fetching bills and transactions:', error);
       toast({
         variant: 'destructive',
         title: 'Error',
-        description: 'Failed to fetch bills',
+        description: 'Failed to fetch bills and transactions',
       });
-    }
-  };
-
-  const fetchTransactions = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('bill_transactions')
-        .select(`*, bill:bills(description, bill_amount)`)
-        .in('bill_id', bills.map(b => b.id))
-        .order('payment_date', { ascending: false });
-
-      if (error) throw error;
-      setTransactions(data || []);
-    } catch (error) {
-      console.error('Error fetching transactions:', error);
-      toast({
-        variant: 'destructive',
-        title: 'Error',
-        description: 'Failed to fetch transactions',
-      });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -146,29 +149,28 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
 
   const calculateInterest = (bill: Bill, balance: number) => {
     if (!bill.interest_rate || bill.interest_type === 'none') return 0;
-
+    
     const rate = bill.interest_rate / 100;
     const startDate = new Date(bill.bill_date);
     const endDate = new Date();
-
-    let interest = 0;
-
+    
     if (bill.interest_type === 'daily') {
-      const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24));
-      interest = balance * rate * (daysDiff / 365);
+      const timeDiff = endDate.getTime() - startDate.getTime();
+      const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+      return balance * rate * (daysDiff / 365);
     } else if (bill.interest_type === 'monthly') {
-      const months = (endDate.getFullYear() - startDate.getFullYear()) * 12 +
+      const months = (endDate.getFullYear() - startDate.getFullYear()) * 12 + 
                      (endDate.getMonth() - startDate.getMonth());
       const daysInMonth = (endDate.getDate() - startDate.getDate()) / 30;
-      interest = balance * rate * (months + daysInMonth);
+      const totalMonths = months + daysInMonth;
+      return balance * rate * totalMonths;
     }
-
-    return Math.round(interest * 100) / 100; // round to 2 decimals
+    
+    return 0;
   };
 
   const calculateTotalOutstanding = () => {
     return bills.reduce((sum, bill) => {
-      if (!bill.is_active) return sum;
       const balance = calculateBillBalance(bill.id);
       const interest = calculateInterest(bill, balance);
       return sum + balance + interest;
@@ -217,7 +219,7 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
       setShowPaymentDialog(false);
       setSelectedBillId('');
 
-      fetchTransactions();
+      fetchBillsAndTransactions();
       if (onUpdate) onUpdate();
     } catch (error) {
       console.error('Error recording payment:', error);
@@ -254,7 +256,9 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
             </div>
           </div>
         </div>
-        {controlSettings.allowBillManagement && (
+       
+      </div>
+      {controlSettings.allowBillManagement && (
           <div className="flex gap-2">
             <Button onClick={() => setAddBillDialogOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
@@ -266,7 +270,6 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
             </Button>
           </div>
         )}
-      </div>
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -384,11 +387,11 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
         </TabsContent>
 
         <TabsContent value="searchBill">
-          <SearchBillbyRef bills={bills} />
+          <SearchBillbyRef bills={bills as any} />
         </TabsContent>
 
         <TabsContent value="searchTransaction">
-          <SearchTransactionById transactions={transactions} />
+          <SearchTransactionById transactions={transactions as any} />
         </TabsContent>
       </Tabs>
 
@@ -488,7 +491,7 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
         onOpenChange={setAddBillDialogOpen}
         mahajan={mahajan}
         onBillAdded={() => {
-          fetchBills();
+          fetchBillsAndTransactions();
           if (onUpdate) onUpdate();
         }}
       />
