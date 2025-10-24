@@ -17,6 +17,7 @@ export interface TabSettings {
   loans: boolean;
   customers: boolean;
   mahajans: boolean;
+  bill_customers: boolean;
   daywise: boolean;
   payments: boolean;
 }
@@ -45,6 +46,7 @@ const Settings = () => {
     loans: true,
     customers: true,
     mahajans: true,
+    bill_customers: true,
     daywise: true,
     payments: true,
   });
@@ -265,6 +267,8 @@ const Settings = () => {
           allowPaymentManager: true,
           allowRecordPayment: true,
           allowEmailChange: true,
+          allowBillManagement: true,
+          allowMahajanDeletion: true,
         });
         } else {
           toast({
@@ -320,6 +324,7 @@ const Settings = () => {
           mahajans: true,
           daywise: true,
           payments: true,
+          bill_customers: true,
         };
         
         const defaultControls = {
@@ -590,6 +595,7 @@ const Settings = () => {
       mahajans: true,
       daywise: true,
       payments: true,
+      bill_customers: true,
     };
 
     const defaultControls = {
