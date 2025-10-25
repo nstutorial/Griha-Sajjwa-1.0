@@ -25,6 +25,7 @@ interface Mahajan {
   phone: string | null;
   address: string | null;
   payment_day: string | null;
+  advance_payment?: number;
   bills?: Array<{
     id: string;
     bill_amount: number;
@@ -144,11 +145,15 @@ const MahajanList = ({ onUpdate }: MahajanListProps) => {
   const calculateOutstandingBalance = (mahajan: Mahajan) => {
     if (!mahajan.bills) return 0;
     
-    return mahajan.bills.reduce((total, bill) => {
+    const billsTotal = mahajan.bills.reduce((total, bill) => {
       const balance = calculateBillBalance(bill.id);
       const interest = calculateInterest(bill, balance);
       return total + balance + interest;
     }, 0);
+
+    // Subtract advance payment from outstanding
+    const advancePayment = mahajan.advance_payment || 0;
+    return billsTotal - advancePayment;
   };
 
   const handleDeleteMahajan = async (mahajanId: string) => {
