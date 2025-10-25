@@ -328,6 +328,7 @@ export type Database = {
       mahajans: {
         Row: {
           address: string | null
+          advance_payment: number
           created_at: string
           id: string
           name: string
@@ -338,6 +339,7 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          advance_payment?: number
           created_at?: string
           id?: string
           name: string
@@ -348,6 +350,7 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          advance_payment?: number
           created_at?: string
           id?: string
           name?: string
