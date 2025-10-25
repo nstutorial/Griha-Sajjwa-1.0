@@ -8,8 +8,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Input } from '@/components/ui/input';
 import { AddBillCustomerDialog } from './AddBillCustomerDialog';
 import { EditBillCustomerDialog } from './EditBillCustomerDialog';
-import AddBillDialog from './AddBillDialog';
-import { Plus, Search, Edit, Phone, Mail, MapPin } from 'lucide-react';
+import { AddSaleDialog } from './AddSaleDialog';
+import { RecordSalePaymentDialog } from './RecordSalePaymentDialog';
+import { Plus, Search, Edit, Phone, Mail, MapPin, DollarSign } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface BillCustomer {
@@ -21,6 +22,18 @@ interface BillCustomer {
   gst_number: string | null;
   outstanding_amount: number;
   created_at: string;
+  sales?: Array<{
+    id: string;
+    sale_amount: number;
+    is_active: boolean;
+  }>;
+}
+
+interface SaleTransaction {
+  id: string;
+  sale_id: string;
+  amount: number;
+  transaction_type: string;
 }
 
 export function BillCustomersList() {
@@ -31,9 +44,11 @@ export function BillCustomersList() {
   const [searchQuery, setSearchQuery] = useState('');
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [addBillDialogOpen, setAddBillDialogOpen] = useState(false);
+  const [addSaleDialogOpen, setAddSaleDialogOpen] = useState(false);
+  const [recordPaymentDialogOpen, setRecordPaymentDialogOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<BillCustomer | null>(null);
   const [loading, setLoading] = useState(true);
+  const [allTransactions, setAllTransactions] = useState<SaleTransaction[]>([]);
 
   const fetchCustomers = async () => {
     if (!user) return;
@@ -41,7 +56,10 @@ export function BillCustomersList() {
     setLoading(true);
     const { data, error } = await supabase
       .from('bill_customers')
-      .select('*')
+      .select(`
+        *,
+        sales (id, sale_amount, is_active)
+      `)
       .eq('user_id', user.id)
       .order('created_at', { ascending: false });
 
@@ -50,6 +68,18 @@ export function BillCustomersList() {
       toast.error('Failed to load bill customers');
       setLoading(false);
       return;
+    }
+
+    // Fetch all transactions for calculating outstanding balances
+    if (data && data.length > 0) {
+      const saleIds = data.flatMap(c => c.sales?.map(s => s.id) || []);
+      if (saleIds.length > 0) {
+        const { data: transData } = await supabase
+          .from('sale_transactions')
+          .select('*')
+          .in('sale_id', saleIds);
+        setAllTransactions(transData || []);
+      }
     }
 
     setCustomers(data || []);
@@ -83,9 +113,32 @@ export function BillCustomersList() {
     setEditDialogOpen(true);
   };
 
-  const handleAddBill = (customer: BillCustomer) => {
+  const handleAddSale = (customer: BillCustomer) => {
     setSelectedCustomer(customer);
-    setAddBillDialogOpen(true);
+    setAddSaleDialogOpen(true);
+  };
+
+  const handleRecordPayment = (customer: BillCustomer) => {
+    const outstanding = calculateCustomerOutstanding(customer);
+    setSelectedCustomer({
+      ...customer,
+      outstanding_amount: outstanding
+    });
+    setRecordPaymentDialogOpen(true);
+  };
+
+  const calculateCustomerOutstanding = (customer: BillCustomer) => {
+    const activeSales = customer.sales?.filter(sale => sale.is_active) || [];
+    return activeSales.reduce((sum, sale) => {
+      const saleTransactions = allTransactions.filter(t => t.sale_id === sale.id);
+      const totalPaid = saleTransactions
+        .filter(t => t.transaction_type === 'payment')
+        .reduce((transactionSum, t) => transactionSum + Number(t.amount), 0);
+      const totalRefund = saleTransactions
+        .filter(t => t.transaction_type === 'refund')
+        .reduce((transactionSum, t) => transactionSum + Number(t.amount), 0);
+      return sum + (Number(sale.sale_amount) - totalPaid + totalRefund);
+    }, 0);
   };
 
   return (
@@ -133,59 +186,71 @@ export function BillCustomersList() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredCustomers.map((customer) => (
-                  <TableRow key={customer.id}>
-                    <TableCell className="font-medium">{customer.name}</TableCell>
-                    <TableCell>
-                      <div className="space-y-1 text-sm">
-                        {customer.phone && (
-                          <div className="flex items-center gap-1">
-                            <Phone className="h-3 w-3" />
-                            {customer.phone}
-                          </div>
-                        )}
-                        {customer.email && (
-                          <div className="flex items-center gap-1">
-                            <Mail className="h-3 w-3" />
-                            {customer.email}
-                          </div>
-                        )}
-                        {customer.address && (
-                          <div className="flex items-center gap-1">
-                            <MapPin className="h-3 w-3" />
-                            {customer.address}
-                          </div>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>{customer.gst_number || '-'}</TableCell>
-                    <TableCell className="text-right font-semibold">
-                      ₹{customer.outstanding_amount.toFixed(2)}
-                    </TableCell>
-                    {controlSettings.allowEdit && (
-                      <TableCell className="text-right">
-                        <div className="flex gap-2 justify-end">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleAddBill(customer)}
-                            title="Add Bill"
-                          >
-                            <Plus className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEdit(customer)}
-                            title="Edit Customer"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
+                {filteredCustomers.map((customer) => {
+                  const outstandingBalance = calculateCustomerOutstanding(customer);
+                  
+                  return (
+                    <TableRow key={customer.id}>
+                      <TableCell className="font-medium">{customer.name}</TableCell>
+                      <TableCell>
+                        <div className="space-y-1 text-sm">
+                          {customer.phone && (
+                            <div className="flex items-center gap-1">
+                              <Phone className="h-3 w-3" />
+                              {customer.phone}
+                            </div>
+                          )}
+                          {customer.email && (
+                            <div className="flex items-center gap-1">
+                              <Mail className="h-3 w-3" />
+                              {customer.email}
+                            </div>
+                          )}
+                          {customer.address && (
+                            <div className="flex items-center gap-1">
+                              <MapPin className="h-3 w-3" />
+                              {customer.address}
+                            </div>
+                          )}
                         </div>
                       </TableCell>
-                    )}
-                  </TableRow>
-                ))}
+                      <TableCell>{customer.gst_number || '-'}</TableCell>
+                      <TableCell className="text-right font-semibold">
+                        ₹{outstandingBalance.toFixed(2)}
+                      </TableCell>
+                      {controlSettings.allowEdit && (
+                        <TableCell className="text-right">
+                          <div className="flex gap-2 justify-end">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleRecordPayment(customer)}
+                              title="Record Payment"
+                            >
+                              <DollarSign className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleAddSale(customer)}
+                              title="Add Sale"
+                            >
+                              <Plus className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEdit(customer)}
+                              title="Edit Customer"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
@@ -205,11 +270,22 @@ export function BillCustomersList() {
         onCustomerUpdated={fetchCustomers}
       />
 
-      <AddBillDialog
-        open={addBillDialogOpen}
-        onOpenChange={setAddBillDialogOpen}
-        mahajan={selectedCustomer ? { id: selectedCustomer.id, name: selectedCustomer.name } : null}
-        onBillAdded={fetchCustomers}
+      <AddSaleDialog
+        open={addSaleDialogOpen}
+        onOpenChange={setAddSaleDialogOpen}
+        customer={selectedCustomer}
+        onSaleAdded={fetchCustomers}
+      />
+
+      <RecordSalePaymentDialog
+        open={recordPaymentDialogOpen}
+        onOpenChange={setRecordPaymentDialogOpen}
+        customer={selectedCustomer ? {
+          id: selectedCustomer.id,
+          name: selectedCustomer.name,
+          outstanding: selectedCustomer.outstanding_amount
+        } : null}
+        onPaymentRecorded={fetchCustomers}
       />
     </Card>
   );
