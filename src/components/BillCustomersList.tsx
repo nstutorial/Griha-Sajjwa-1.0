@@ -182,7 +182,7 @@ export function BillCustomersList() {
                   <TableHead>Contact</TableHead>
                   <TableHead>GST Number</TableHead>
                   <TableHead className="text-right">Outstanding</TableHead>
-                  {controlSettings.allowEdit && <TableHead className="text-right">Actions</TableHead>}
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -218,7 +218,7 @@ export function BillCustomersList() {
                       <TableCell className="text-right font-semibold">
                         ₹{outstandingBalance.toFixed(2)}
                       </TableCell>
-                      {controlSettings.allowEdit && (
+                      
                         <TableCell className="text-right">
                           <div className="flex gap-2 justify-end">
                             <Button
@@ -237,6 +237,7 @@ export function BillCustomersList() {
                             >
                               <Plus className="h-4 w-4" />
                             </Button>
+                            {controlSettings.allowEdit && 
                             <Button
                               variant="ghost"
                               size="sm"
@@ -244,10 +245,10 @@ export function BillCustomersList() {
                               title="Edit Customer"
                             >
                               <Edit className="h-4 w-4" />
-                            </Button>
+                            </Button>}
                           </div>
                         </TableCell>
-                      )}
+                      )
                     </TableRow>
                   );
                 })}
