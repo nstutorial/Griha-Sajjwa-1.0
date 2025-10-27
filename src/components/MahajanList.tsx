@@ -12,12 +12,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Phone, Trash2, MapPin, Eye, Calendar, Edit, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Phone, Trash2, MapPin, Eye, Calendar, Edit, Plus, ChevronLeft, ChevronRight, Info } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useControl } from '@/contexts/ControlContext';
 import MahajanDetails from './MahajanDetails';
 import EditMahajanDialog from './EditMahajanDialog';
 import AddBillDialog from './AddBillDialog';
+import { AdvancePaymentDetailsDialog } from './AdvancePaymentDetailsDialog';
 
 interface Mahajan {
   id: string;
@@ -55,6 +56,8 @@ const MahajanList = ({ onUpdate }: MahajanListProps) => {
   const [allTransactions, setAllTransactions] = useState<any[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  const [advanceDetailsOpen, setAdvanceDetailsOpen] = useState(false);
+  const [selectedMahajanForAdvance, setSelectedMahajanForAdvance] = useState<Mahajan | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -328,17 +331,41 @@ const MahajanList = ({ onUpdate }: MahajanListProps) => {
                     </div>
                   )}
 
-                  <div className="flex items-center justify-between pt-2 border-t">
-                    <div className="text-sm">
-                      <div className="text-muted-foreground">Active Bills</div>
-                      <div className="font-medium">{activeBills}</div>
-                    </div>
-                    <div className="text-sm text-right">
-                      <div className="text-muted-foreground">Outstanding</div>
-                      <div className={`font-medium ${outstandingBalance > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                        {formatCurrency(outstandingBalance)}
+                  <div className="space-y-2 pt-2 border-t">
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm">
+                        <div className="text-muted-foreground">Active Bills</div>
+                        <div className="font-medium">{activeBills}</div>
+                      </div>
+                      <div className="text-sm text-right">
+                        <div className="text-muted-foreground">Outstanding</div>
+                        <div className={`font-medium ${outstandingBalance > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                          {formatCurrency(outstandingBalance)}
+                        </div>
                       </div>
                     </div>
+
+                    {mahajan.advance_payment && mahajan.advance_payment > 0 && (
+                      <div className="flex items-center justify-between pt-2 border-t border-dashed">
+                        <div className="text-sm">
+                          <div className="text-muted-foreground">Advance Payment</div>
+                          <div className="font-medium text-green-600">
+                            {formatCurrency(mahajan.advance_payment)}
+                          </div>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedMahajanForAdvance(mahajan);
+                            setAdvanceDetailsOpen(true);
+                          }}
+                          className="h-8 px-2"
+                        >
+                          <Info className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex gap-2 pt-2">
@@ -438,6 +465,16 @@ const MahajanList = ({ onUpdate }: MahajanListProps) => {
             fetchMahajans();
             if (onUpdate) onUpdate();
           }}
+        />
+      )}
+
+      {/* Advance Payment Details Dialog */}
+      {advanceDetailsOpen && selectedMahajanForAdvance && (
+        <AdvancePaymentDetailsDialog
+          open={advanceDetailsOpen}
+          onOpenChange={setAdvanceDetailsOpen}
+          mahajanId={selectedMahajanForAdvance.id}
+          mahajanName={selectedMahajanForAdvance.name}
         />
       )}
     </div>
