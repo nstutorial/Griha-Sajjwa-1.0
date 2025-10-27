@@ -110,5 +110,6 @@ export function AddPartnerDialog({ open, onOpenChange, onPartnerAdded }: AddPart
         </form>
       </DialogContent>
     </Dialog>
+    
   );
 }
