@@ -15,6 +15,8 @@ import PasswordManagement from "./pages/PasswordManagement";
 import Reminders from "./pages/Reminders";
 import BillReminders from "./pages/BillReminders";
 import BillCustomers from "./pages/BillCustomers";
+import Partners from "./pages/Partners";
+import PartnerDetails from "./pages/PartnerDetails";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -107,6 +109,21 @@ const AppRoutes = () => {
       <Route path="/bill-reminders" element={
         <ProtectedRoute>
           <BillReminders />
+        </ProtectedRoute>
+      } />
+      <Route path="/bill-customers" element={
+        <ProtectedRoute>
+          <BillCustomers />
+        </ProtectedRoute>
+      } />
+      <Route path="/partners" element={
+        <ProtectedRoute>
+          <Partners />
+        </ProtectedRoute>
+      } />
+      <Route path="/partners/:id" element={
+        <ProtectedRoute>
+          <PartnerDetails />
         </ProtectedRoute>
       } />
       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
