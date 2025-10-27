@@ -361,6 +361,83 @@ export type Database = {
         }
         Relationships: []
       }
+      partner_transactions: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          mahajan_id: string
+          notes: string | null
+          partner_id: string
+          payment_date: string
+          payment_mode: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          mahajan_id: string
+          notes?: string | null
+          partner_id: string
+          payment_date?: string
+          payment_mode?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          mahajan_id?: string
+          notes?: string | null
+          partner_id?: string
+          payment_date?: string
+          payment_mode?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "partner_transactions_mahajan_id_fkey"
+            columns: ["mahajan_id"]
+            isOneToOne: false
+            referencedRelation: "mahajans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      partners: {
+        Row: {
+          address: string | null
+          created_at: string
+          email: string | null
+          id: string
+          name: string
+          phone: string | null
+          total_invested: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          address?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name: string
+          phone?: string | null
+          total_invested?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          address?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string
+          phone?: string | null
+          total_invested?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
