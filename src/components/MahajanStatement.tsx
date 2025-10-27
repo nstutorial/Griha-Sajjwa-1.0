@@ -163,9 +163,18 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
                        (!endDate || paymentDate <= new Date(endDate));
 
       if (isInRange) {
+        // Extract partner name from notes if present
+        let partnerInfo = '';
+        if (transaction.notes && transaction.notes.includes('Payment from partner:')) {
+          const partnerMatch = transaction.notes.match(/Payment from partner: ([^-]+)/);
+          if (partnerMatch) {
+            partnerInfo = ` [Partner: ${partnerMatch[1].trim()}]`;
+          }
+        }
+
         allEntries.push({
           date: transaction.payment_date,
-          description: `Paid - ${transaction.bill.description || 'Bill'} (${transaction.bill.bill_number}) - ${transaction.transaction_type} via ${transaction.payment_mode}-${transaction.notes}`,
+          description: `Paid - ${transaction.bill.description || 'Bill'} (${transaction.bill.bill_number}) - ${transaction.transaction_type} via ${transaction.payment_mode}${partnerInfo}${transaction.notes && !transaction.notes.includes('Payment from partner:') ? ' - ' + transaction.notes : ''}`,
           reference: transaction.id,
           debit: 0,
           credit: transaction.amount,
