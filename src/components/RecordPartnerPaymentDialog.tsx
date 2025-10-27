@@ -96,6 +96,22 @@ export function RecordPartnerPaymentDialog({
         if (updateError) throw updateError;
       }
 
+      // Get partner and mahajan names for better tracking
+      const { data: partnerData } = await supabase
+        .from('partners')
+        .select('name')
+        .eq('id', partnerId)
+        .single();
+
+      const { data: mahajanData } = await supabase
+        .from('mahajans')
+        .select('name')
+        .eq('id', mahajanId)
+        .single();
+
+      const partnerName = partnerData?.name || 'Partner';
+      const mahajanName = mahajanData?.name || 'Mahajan';
+
       // Handle mahajan payment: reduce outstanding bills or add to advance payment
       const { data: activeBills } = await supabase
         .from('bills')
@@ -135,7 +151,7 @@ export function RecordPartnerPaymentDialog({
                 transaction_type: 'principal',
                 payment_date: paymentDate,
                 payment_mode: billPaymentMode,
-                notes: `Payment from partner${notes ? ': ' + notes : ''}`,
+                notes: `Payment from partner: ${partnerName}${notes ? ' - ' + notes : ''}`,
               });
 
             if (billTxError) throw billTxError;
