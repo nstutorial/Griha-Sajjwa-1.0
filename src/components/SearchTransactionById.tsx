@@ -13,7 +13,7 @@ interface Transaction {
   amount: number;
   transaction_type: 'principal' | 'interest' | 'mixed';
   payment_date: string;
-  payment_mode: string; // Should match your enum 'payment_method'
+  payment_mode: string;
   notes?: string;
 }
 
@@ -23,6 +23,7 @@ const SearchTransactionById = ({ transactions }: { transactions: Transaction[] }
   const [editTransaction, setEditTransaction] = useState<Transaction | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   // 🔍 Search by Primary Key (id)
   const handleSearch = () => {
@@ -34,7 +35,6 @@ const SearchTransactionById = ({ transactions }: { transactions: Transaction[] }
     }
 
     const result = transactions.filter((t) => t.id.toLowerCase() === idTerm.toLowerCase());
-
     if (result.length === 0) toast.error('No matching transactions found');
 
     setFilteredTransactions(result);
@@ -54,7 +54,6 @@ const SearchTransactionById = ({ transactions }: { transactions: Transaction[] }
           payment_date: editTransaction.payment_date,
           payment_mode: editTransaction.payment_mode,
           notes: editTransaction.notes,
-          // updated_at: new Date().toISOString(),
         })
         .eq('id', editTransaction.id);
 
@@ -74,6 +73,32 @@ const SearchTransactionById = ({ transactions }: { transactions: Transaction[] }
       }
     } catch (error: any) {
       toast.error(error.message || 'Failed to update transaction');
+    }
+  };
+
+  // ❌ Delete transaction
+  const handleDelete = async (id: string) => {
+    const confirmDelete = window.confirm('Are you sure you want to delete this transaction?');
+    if (!confirmDelete) return;
+
+    try {
+      setDeleteLoading(true);
+      const { error } = await supabase.from('bill_transactions').delete().eq('id', id);
+      if (error) throw error;
+
+      setFilteredTransactions((prev) => prev.filter((t) => t.id !== id));
+      toast.success('Transaction deleted successfully');
+
+      // Trigger global refresh if needed
+      try {
+        window.dispatchEvent(new Event('refresh-mahajans'));
+      } catch {
+        // no-op
+      }
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to delete transaction');
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -130,9 +155,16 @@ const SearchTransactionById = ({ transactions }: { transactions: Transaction[] }
                   <TableCell>{t.payment_date}</TableCell>
                   <TableCell>{t.payment_mode}</TableCell>
                   <TableCell>{t.notes || '—'}</TableCell>
-                  <TableCell>
+                  <TableCell className="space-x-2">
                     <Button variant="outline" onClick={() => setEditTransaction(t)}>
                       Edit
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      onClick={() => handleDelete(t.id)}
+                      disabled={deleteLoading}
+                    >
+                      {deleteLoading ? 'Deleting...' : 'Delete'}
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -172,12 +204,12 @@ const SearchTransactionById = ({ transactions }: { transactions: Transaction[] }
       {/* ✏️ Edit Modal */}
       <Dialog open={!!editTransaction} onOpenChange={() => setEditTransaction(null)}>
         <DialogContent>
-         <DialogHeader>
-    <DialogTitle>Edit Transaction</DialogTitle>
-    <DialogDescription>
-      Update the details of this transaction and save changes.
-    </DialogDescription>
-  </DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Edit Transaction</DialogTitle>
+            <DialogDescription>
+              Update the details of this transaction and save changes.
+            </DialogDescription>
+          </DialogHeader>
 
           {editTransaction && (
             <div className="space-y-4">
