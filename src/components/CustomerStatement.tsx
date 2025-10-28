@@ -110,7 +110,7 @@ const CustomerStatement: React.FC<CustomerStatementProps> = ({ customer }) => {
           .order('payment_date', { ascending: true });
 
         if (transactionsError) throw transactionsError;
-        setTransactions(transactionsData || []);
+        setTransactions((transactionsData || []) as any);
       } else {
         setTransactions([]);
       }

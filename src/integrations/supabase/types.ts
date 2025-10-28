@@ -213,6 +213,176 @@ export type Database = {
         }
         Relationships: []
       }
+      expense_categories: {
+        Row: {
+          color: string | null
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          type?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      expenses: {
+        Row: {
+          amount: number
+          category_id: string | null
+          created_at: string
+          date: string
+          description: string
+          id: string
+          payment_method: Database["public"]["Enums"]["payment_method"]
+          type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          category_id?: string | null
+          created_at?: string
+          date?: string
+          description: string
+          id?: string
+          payment_method: Database["public"]["Enums"]["payment_method"]
+          type?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          category_id?: string | null
+          created_at?: string
+          date?: string
+          description?: string
+          id?: string
+          payment_method?: Database["public"]["Enums"]["payment_method"]
+          type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expenses_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "expense_categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      firm_accounts: {
+        Row: {
+          account_name: string
+          account_number: string | null
+          account_type: string
+          bank_name: string | null
+          created_at: string
+          current_balance: number
+          id: string
+          is_active: boolean | null
+          opening_balance: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_name: string
+          account_number?: string | null
+          account_type: string
+          bank_name?: string | null
+          created_at?: string
+          current_balance?: number
+          id?: string
+          is_active?: boolean | null
+          opening_balance?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_name?: string
+          account_number?: string | null
+          account_type?: string
+          bank_name?: string | null
+          created_at?: string
+          current_balance?: number
+          id?: string
+          is_active?: boolean | null
+          opening_balance?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      firm_transactions: {
+        Row: {
+          amount: number
+          created_at: string
+          description: string | null
+          firm_account_id: string
+          id: string
+          partner_id: string | null
+          transaction_date: string
+          transaction_type: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          description?: string | null
+          firm_account_id: string
+          id?: string
+          partner_id?: string | null
+          transaction_date?: string
+          transaction_type: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          description?: string | null
+          firm_account_id?: string
+          id?: string
+          partner_id?: string | null
+          transaction_date?: string
+          transaction_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "firm_transactions_firm_account_id_fkey"
+            columns: ["firm_account_id"]
+            isOneToOne: false
+            referencedRelation: "firm_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "firm_transactions_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       loan_transactions: {
         Row: {
           amount: number
@@ -398,6 +568,13 @@ export type Database = {
             columns: ["mahajan_id"]
             isOneToOne: false
             referencedRelation: "mahajans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "partner_transactions_partner_id_fkey"
+            columns: ["partner_id"]
+            isOneToOne: false
+            referencedRelation: "partners"
             referencedColumns: ["id"]
           },
         ]

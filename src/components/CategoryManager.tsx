@@ -78,7 +78,7 @@ const CategoryManager: React.FC<CategoryManagerProps> = ({ onCategoryChange }) =
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setCategories(data || []);
+      setCategories((data || []) as Category[]);
     } catch (error) {
       console.error('Error fetching categories:', error);
       toast({

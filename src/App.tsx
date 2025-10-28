@@ -17,6 +17,7 @@ import BillReminders from "./pages/BillReminders";
 import BillCustomers from "./pages/BillCustomers";
 import Partners from "./pages/Partners";
 import PartnerDetails from "./pages/PartnerDetails";
+import FirmAccounts from "./pages/FirmAccounts";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -124,6 +125,11 @@ const AppRoutes = () => {
       <Route path="/partners/:id" element={
         <ProtectedRoute>
           <PartnerDetails />
+        </ProtectedRoute>
+      } />
+      <Route path="/firm-accounts" element={
+        <ProtectedRoute>
+          <FirmAccounts />
         </ProtectedRoute>
       } />
       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

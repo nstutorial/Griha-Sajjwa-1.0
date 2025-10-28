@@ -13,7 +13,7 @@ interface Transaction {
   amount: number;
   transaction_type: 'principal' | 'interest' | 'mixed';
   payment_date: string;
-  payment_mode: string;
+  payment_mode: 'bank' | 'cash';
   notes?: string;
 }
 
@@ -262,7 +262,7 @@ const SearchTransactionById = ({ transactions }: { transactions: Transaction[] }
                   type="text"
                   value={editTransaction.payment_mode}
                   onChange={(e) =>
-                    setEditTransaction({ ...editTransaction, payment_mode: e.target.value })
+                    setEditTransaction({ ...editTransaction, payment_mode: e.target.value as 'bank' | 'cash' })
                   }
                 />
               </div>

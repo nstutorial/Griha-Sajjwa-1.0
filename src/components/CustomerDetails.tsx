@@ -122,7 +122,7 @@ const CustomerDetails: React.FC<CustomerDetailsProps> = ({ customer, onBack }) =
         .order('payment_date', { ascending: true });
 
       if (error) throw error;
-      setTransactions(data || []);
+      setTransactions((data || []) as any);
     } catch (error) {
       console.error('Error fetching transactions:', error);
     }

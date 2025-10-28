@@ -6,6 +6,7 @@ import { ArrowLeft, Plus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { RecordPartnerPaymentDialog } from '@/components/RecordPartnerPaymentDialog';
+import { ReceiveMoneyDialog } from '@/components/ReceiveMoneyDialog';
 import { PartnerStatement } from '@/components/PartnerStatement';
 
 interface Partner {
@@ -33,6 +34,7 @@ export default function PartnerDetails() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
+  const [showReceiveMoneyDialog, setShowReceiveMoneyDialog] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -69,6 +71,7 @@ export default function PartnerDetails() {
           payment_date,
           payment_mode,
           notes,
+          mahajan_id,
           mahajans (name)
         `)
         .eq('partner_id', id)
@@ -82,7 +85,7 @@ export default function PartnerDetails() {
         payment_date: t.payment_date,
         payment_mode: t.payment_mode,
         notes: t.notes,
-        mahajan_name: (t.mahajans as any)?.name || 'Unknown'
+        mahajan_name: t.mahajan_id ? ((t.mahajans as any)?.name || 'Unknown') : 'Firm Account'
       }));
 
       setTransactions(formattedTransactions);
@@ -120,10 +123,15 @@ export default function PartnerDetails() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>{partner.name}</CardTitle>
-            <Button onClick={() => setShowPaymentDialog(true)}>
-              <Plus className="h-4 w-4 mr-2" />
-              Record Payment
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setShowReceiveMoneyDialog(true)}>
+                Receive Money
+              </Button>
+              <Button onClick={() => setShowPaymentDialog(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Record Payment
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="grid gap-4 md:grid-cols-2">
@@ -162,6 +170,14 @@ export default function PartnerDetails() {
         open={showPaymentDialog}
         onOpenChange={setShowPaymentDialog}
         partnerId={partner.id}
+        onPaymentAdded={handlePaymentAdded}
+      />
+
+      <ReceiveMoneyDialog
+        open={showReceiveMoneyDialog}
+        onOpenChange={setShowReceiveMoneyDialog}
+        partnerId={partner.id}
+        partnerName={partner.name}
         onPaymentAdded={handlePaymentAdded}
       />
     </div>

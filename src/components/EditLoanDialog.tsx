@@ -102,7 +102,6 @@ const EditLoanDialog: React.FC<EditLoanDialogProps> = ({
   const calculateLoanBalance = (loanId: string) => {
     const loanTransactions = transactions.filter(t => t.loan_id === loanId);
     const totalPaid = loanTransactions.reduce((sum, t) => sum + t.amount, 0);
-    const loan = loan; // Use the current loan
     return loan ? loan.principal_amount - totalPaid : 0;
   };
 

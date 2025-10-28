@@ -57,12 +57,8 @@ export class PDFDownloader {
       await Share.share({
         title: 'Money Tracker Pro Statement',
         text: 'Please find attached your statement PDF',
-        files: [{
-          webPath: null,
-          mimeType: 'application/pdf',
-          name: filename,
-          data: base64Data
-        }]
+        files: [base64Data],
+        dialogTitle: 'Share PDF'
       });
 
     } catch (error) {
