@@ -302,7 +302,7 @@ export type Database = {
           created_at: string
           current_balance: number
           id: string
-          is_active: boolean | null
+          is_active: boolean
           opening_balance: number
           updated_at: string
           user_id: string
@@ -315,7 +315,7 @@ export type Database = {
           created_at?: string
           current_balance?: number
           id?: string
-          is_active?: boolean | null
+          is_active?: boolean
           opening_balance?: number
           updated_at?: string
           user_id: string
@@ -328,7 +328,7 @@ export type Database = {
           created_at?: string
           current_balance?: number
           id?: string
-          is_active?: boolean | null
+          is_active?: boolean
           opening_balance?: number
           updated_at?: string
           user_id?: string
@@ -372,13 +372,6 @@ export type Database = {
             columns: ["firm_account_id"]
             isOneToOne: false
             referencedRelation: "firm_accounts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "firm_transactions_partner_id_fkey"
-            columns: ["partner_id"]
-            isOneToOne: false
-            referencedRelation: "partners"
             referencedColumns: ["id"]
           },
         ]
@@ -536,7 +529,7 @@ export type Database = {
           amount: number
           created_at: string
           id: string
-          mahajan_id: string
+          mahajan_id: string | null
           notes: string | null
           partner_id: string
           payment_date: string
@@ -546,7 +539,7 @@ export type Database = {
           amount: number
           created_at?: string
           id?: string
-          mahajan_id: string
+          mahajan_id?: string | null
           notes?: string | null
           partner_id: string
           payment_date?: string
@@ -556,7 +549,7 @@ export type Database = {
           amount?: number
           created_at?: string
           id?: string
-          mahajan_id?: string
+          mahajan_id?: string | null
           notes?: string | null
           partner_id?: string
           payment_date?: string

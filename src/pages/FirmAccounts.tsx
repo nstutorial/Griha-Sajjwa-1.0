@@ -5,7 +5,6 @@ import { Plus, Eye, EyeOff, ArrowLeft, FileText } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { AddFirmAccountDialog } from '@/components/AddFirmAccountDialog';
-import { FirmAccountStatement } from '@/components/FirmAccountStatement';
 import { useNavigate } from 'react-router-dom';
 
 interface FirmAccount {
@@ -25,8 +24,6 @@ export default function FirmAccounts() {
   const [accounts, setAccounts] = useState<FirmAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddDialog, setShowAddDialog] = useState(false);
-  const [showStatementDialog, setShowStatementDialog] = useState(false);
-  const [selectedAccount, setSelectedAccount] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
     fetchAccounts();
@@ -69,23 +66,17 @@ export default function FirmAccounts() {
     return <div className="container mx-auto p-6">Loading...</div>;
   }
 
-  const handleViewStatement = (accountId: string, accountName: string) => {
-    setSelectedAccount({ id: accountId, name: accountName });
-    setShowStatementDialog(true);
+  const handleViewStatement = (accountId: string) => {
+    navigate(`/firm-accounts/${accountId}`);
   };
 
   return (
     <div className="container mx-auto p-6">
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center gap-4">
-           <Button 
-        variant="ghost" 
-        onClick={() => navigate('/')}
-        className="mb-4"
-      >
-        <ArrowLeft className="h-4 w-4 mr-2" />
-        Back to Dashboard
-      </Button>
+          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
           <h1 className="text-3xl font-bold">Firm Accounts</h1>
         </div>
         <Button onClick={() => setShowAddDialog(true)}>
@@ -143,7 +134,7 @@ export default function FirmAccounts() {
                   variant="outline" 
                   size="sm" 
                   className="w-full mt-2"
-                  onClick={() => handleViewStatement(account.id, account.account_name)}
+                  onClick={() => handleViewStatement(account.id)}
                 >
                   <FileText className="h-4 w-4 mr-2" />
                   View Details
@@ -167,15 +158,6 @@ export default function FirmAccounts() {
         onOpenChange={setShowAddDialog}
         onAccountAdded={fetchAccounts}
       />
-      
-      {selectedAccount && (
-        <FirmAccountStatement
-          open={showStatementDialog}
-          onOpenChange={setShowStatementDialog}
-          accountId={selectedAccount.id}
-          accountName={selectedAccount.name}
-        />
-      )}
     </div>
   );
 }

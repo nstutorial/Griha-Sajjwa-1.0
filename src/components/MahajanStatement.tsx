@@ -83,6 +83,47 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
     }
   }, [bills, transactions, startDate, endDate]);
 
+  // Realtime subscriptions for partner transaction updates
+  useEffect(() => {
+    if (!mahajan.id) return;
+
+    const partnerTransactionsChannel = supabase
+      .channel('mahajan-partner-transactions-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'partner_transactions',
+          filter: `mahajan_id=eq.${mahajan.id}`
+        },
+        () => {
+          fetchMahajanData();
+        }
+      )
+      .subscribe();
+
+    const billTransactionsChannel = supabase
+      .channel('mahajan-bill-transactions-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'bill_transactions'
+        },
+        () => {
+          fetchMahajanData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(partnerTransactionsChannel);
+      supabase.removeChannel(billTransactionsChannel);
+    };
+  }, [mahajan.id]);
+
   const fetchMahajanData = async () => {
     try {
       setLoading(true);
