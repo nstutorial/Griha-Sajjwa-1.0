@@ -98,6 +98,7 @@ export function EditFirmTransactionDialog({
               <SelectContent>
                 <SelectItem value="partner_deposit">Partner Deposit</SelectItem>
                 <SelectItem value="partner_withdrawal">Partner Withdrawal</SelectItem>
+                <SelectItem value="refund">Refund</SelectItem>
                 <SelectItem value="expense">Expense</SelectItem>
                 <SelectItem value="income">Income</SelectItem>
                 <SelectItem value="adjustment">Adjustment</SelectItem>
