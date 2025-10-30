@@ -171,7 +171,7 @@ const fetchTransactions = async () => {
         adjustedAmount = Math.abs(t.amount);
       } else if (t.transaction_type === 'expense') {
         // Expense from firm, doesn't affect partner
-        adjustedAmount = t.amount*-1;
+        adjustedAmount = Math.abs(t.amount);
       } else {
         // Other transaction types (just in case)
         adjustedAmount = Math.abs(t.amount);
