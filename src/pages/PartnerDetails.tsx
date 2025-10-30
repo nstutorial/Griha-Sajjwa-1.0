@@ -263,9 +263,9 @@ const fetchTransactions = async () => {
                 <ArrowLeftRight className="h-4 w-4 mr-2" />
                 Transfer
               </Button>
-              <Button variant="outline" size="sm" onClick={() => setShowReceiveMoneyDialog(true)}>
+              {/* <Button variant="outline" size="sm" onClick={() => setShowReceiveMoneyDialog(true)}>
                 Receive Money
-              </Button>
+              </Button> */}
               <Button size="sm" onClick={() => setShowPaymentDialog(true)}>
                 <Plus className="h-4 w-4 mr-2" />
                 Record Payment
