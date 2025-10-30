@@ -28,57 +28,60 @@ export default function Partners() {
   }, []);
 
   const fetchPartners = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('partners')
-        .select('*')
-        .order('name');
+  try {
+    const { data, error } = await supabase
+      .from('partners')
+      .select('*')
+      .order('name');
 
-      if (error) throw error;
+    if (error) throw error;
 
-      const partnersWithStats = await Promise.all(
-        (data || []).map(async (partner) => {
-          // Fetch all transactions related to this partner
-          const { data: partnerTxns } = await supabase
-            .from('partner_transactions')
-            .select('amount, transaction_type')
-            .eq('partner_id', partner.id);
+    const partnersWithStats = await Promise.all(
+      (data || []).map(async (partner) => {
+        // Fetch all partner-related transactions
+        const { data: partnerTxns } = await supabase
+          .from('partner_transactions')
+          .select('amount')
+          .eq('partner_id', partner.id);
 
-          const { data: firmTxns } = await supabase
-            .from('firm_transactions')
-            .select('amount, transaction_type')
-            .eq('partner_id', partner.id);
+        // Fetch firm-related partner deposits/withdrawals
+        const { data: firmTxns } = await supabase
+          .from('firm_transactions')
+          .select('amount, transaction_type')
+          .eq('partner_id', partner.id);
 
-          // Combine transactions
-          const allTxns = [...(partnerTxns || []), ...(firmTxns || [])];
+        // Combine all transactions
+        const allTxns = [...(partnerTxns || []), ...(firmTxns || [])];
 
-          // Calculate total investment and balance
-          let total_invested = 0;
-          let total_withdrawn = 0;
+        // ✅ Compute totals dynamically
+        let total_invested = 0;
+        let total_withdrawn = 0;
 
-          allTxns.forEach(txn => {
-            if (txn.amount > 0) total_invested += txn.amount;
-            else total_withdrawn += Math.abs(txn.amount);
-          });
+        allTxns.forEach((txn) => {
+          if (txn.amount > 0) total_invested += txn.amount;
+          else total_withdrawn += Math.abs(txn.amount);
+        });
 
-          const balance = total_invested - total_withdrawn;
+        // ✅ True balance can be negative if withdrawals > investments
+        const balance = total_invested - total_withdrawn;
 
-          return {
-            ...partner,
-            total_invested,
-            balance,
-          };
-        })
-      );
+        return {
+          ...partner,
+          total_invested,
+          balance,
+        };
+      })
+    );
 
-      setPartners(partnersWithStats);
-    } catch (error: any) {
-      console.error('Error fetching partners:', error);
-      toast.error('Failed to load partners');
-    } finally {
-      setLoading(false);
-    }
-  };
+    setPartners(partnersWithStats);
+  } catch (error: any) {
+    console.error('Error fetching partners:', error);
+    toast.error('Failed to load partners');
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   return (
     <div className="container mx-auto p-6">
