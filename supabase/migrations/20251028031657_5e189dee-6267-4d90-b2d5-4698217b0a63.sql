@@ -37,7 +37,7 @@ USING (auth.uid() = user_id);
 CREATE TABLE public.firm_transactions (
   id UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
   firm_account_id UUID NOT NULL REFERENCES public.firm_accounts(id) ON DELETE CASCADE,
-  transaction_type TEXT NOT NULL CHECK (transaction_type IN ('partner_withdrawal', 'partner_investment', 'expense', 'income', 'transfer')),
+  transaction_type TEXT NOT NULL CHECK (transaction_type IN ('partner_withdrawal', 'refund', 'partner_investment', 'expense', 'income', 'transfer')),
   amount NUMERIC(12,2) NOT NULL,
   partner_id UUID REFERENCES public.partners(id) ON DELETE SET NULL,
   description TEXT,
