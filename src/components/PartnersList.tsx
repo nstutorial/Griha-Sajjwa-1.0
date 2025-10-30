@@ -24,14 +24,14 @@ export function PartnersList({ partners }: { partners: Partner[] }) {
         >
           <CardHeader>
             <CardTitle className="flex justify-between items-center">
-                 <span>{partner.name}</span>
-              {/* ✅ Multiply first, then apply logic */}
+              <span>{partner.name}</span>
+              {/* ✅ Show balance color-coded */}
               <span
                 className={`text-sm font-semibold ${
-                  (partner.total_invested * -1) >= 0 ? "text-green-600" : "text-red-600"
+                  partner.total_invested >= 0 ? "text-green-600" : "text-red-600"
                 }`}
               >
-                ₹{(partner.total_invested * -1).toFixed(2)}
+                ₹{partner.total_invested.toFixed(2)}
               </span>
             </CardTitle>
           </CardHeader>
