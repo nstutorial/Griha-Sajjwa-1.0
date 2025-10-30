@@ -49,7 +49,7 @@ export default function FirmAccounts() {
           const calculatedBalance = (txns || []).reduce((balance, txn) => {
             if (txn.transaction_type === 'partner_deposit' || txn.transaction_type === 'income') {
               return balance + txn.amount;
-            } else if (txn.transaction_type === 'partner_withdrawal' || txn.transaction_type === 'expense') {
+            } else if (txn.transaction_type === 'partner_withdrawal' || txn.transaction_type === 'expense' ||  txn.transaction_type === 'refund') {
               return balance - txn.amount;
             }
             return balance;
