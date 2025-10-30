@@ -34,7 +34,34 @@ export default function Partners() {
         .order('name');
 
       if (error) throw error;
-      setPartners(data || []);
+
+      // Calculate total_invested from transaction history for each partner
+      const partnersWithCalculatedInvestment = await Promise.all(
+        (data || []).map(async (partner) => {
+          // Fetch partner_transactions
+          const { data: partnerTxns } = await supabase
+            .from('partner_transactions')
+            .select('amount')
+            .eq('partner_id', partner.id);
+
+          // Fetch firm_transactions where this partner received money
+          const { data: firmTxns } = await supabase
+            .from('firm_transactions')
+            .select('amount')
+            .eq('partner_id', partner.id)
+            .eq('transaction_type', 'partner_deposit');
+
+          const partnerTxnTotal = (partnerTxns || []).reduce((sum, txn) => sum + txn.amount, 0);
+          const firmTxnTotal = (firmTxns || []).reduce((sum, txn) => sum + txn.amount, 0);
+
+          return {
+            ...partner,
+            total_invested: partnerTxnTotal + firmTxnTotal
+          };
+        })
+      );
+
+      setPartners(partnersWithCalculatedInvestment);
     } catch (error: any) {
       console.error('Error fetching partners:', error);
       toast.error('Failed to load partners');

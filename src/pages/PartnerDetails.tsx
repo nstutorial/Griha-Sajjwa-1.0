@@ -95,6 +95,39 @@ export default function PartnerDetails() {
 
   const fetchPartnerDetails = async () => {
     try {
+      // Calculate total_invested from partner_transactions and firm_transactions
+      const [partnerTxns, firmTxns] = await Promise.all([
+        supabase
+          .from('partner_transactions')
+          .select('amount')
+          .eq('partner_id', id),
+        supabase
+          .from('firm_transactions')
+          .select('amount, transaction_type')
+          .eq('partner_id', id)
+      ]);
+
+      if (partnerTxns.error) throw partnerTxns.error;
+      if (firmTxns.error) throw firmTxns.error;
+
+      // Calculate total from partner_transactions (positive values are investments)
+      const partnerTotal = (partnerTxns.data || [])
+        .reduce((sum, txn) => sum + (txn.amount > 0 ? txn.amount : 0), 0);
+
+      // Calculate total from firm_transactions (deposits add to investment)
+      const firmTotal = (firmTxns.data || [])
+        .reduce((sum, txn) => {
+          if (txn.transaction_type === 'partner_deposit') {
+            return sum + txn.amount;
+          } else if (txn.transaction_type === 'partner_withdrawal') {
+            return sum - txn.amount;
+          }
+          return sum;
+        }, 0);
+
+      const totalInvested = partnerTotal + firmTotal;
+
+      // Get partner basic info
       const { data, error } = await supabase
         .from('partners')
         .select('*')
@@ -102,7 +135,7 @@ export default function PartnerDetails() {
         .single();
 
       if (error) throw error;
-      setPartner(data);
+      setPartner({ ...data, total_invested: totalInvested });
     } catch (error: any) {
       console.error('Error fetching partner:', error);
       toast.error('Failed to load partner details');

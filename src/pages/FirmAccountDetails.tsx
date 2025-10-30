@@ -3,12 +3,13 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft, Edit, Trash2 } from 'lucide-react';
+import { ArrowLeft, Edit, Trash2, Send } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { useControl } from '@/contexts/ControlContext';
 import { EditFirmTransactionDialog } from '@/components/EditFirmTransactionDialog';
+import { SendMoneyDialog } from '@/components/SendMoneyDialog';
 
 interface FirmAccount {
   id: string;
@@ -40,6 +41,7 @@ export default function FirmAccountDetails() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [sendMoneyDialogOpen, setSendMoneyDialogOpen] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
 
   useEffect(() => {
@@ -47,6 +49,32 @@ export default function FirmAccountDetails() {
       fetchAccountDetails();
       fetchTransactions();
     }
+  }, [id]);
+
+  // Realtime subscription for firm_transactions
+  useEffect(() => {
+    if (!id) return;
+
+    const channel = supabase
+      .channel('firm-transactions-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'firm_transactions',
+          filter: `firm_account_id=eq.${id}`
+        },
+        () => {
+          fetchTransactions();
+          fetchAccountDetails();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [id]);
 
   const fetchAccountDetails = async () => {
@@ -58,7 +86,25 @@ export default function FirmAccountDetails() {
         .single();
 
       if (error) throw error;
-      setAccount(data);
+
+      // Calculate current balance from transaction history
+      const { data: txns, error: txnError } = await supabase
+        .from('firm_transactions')
+        .select('amount, transaction_type')
+        .eq('firm_account_id', id);
+
+      if (txnError) throw txnError;
+
+      const calculatedBalance = (txns || []).reduce((balance, txn) => {
+        if (txn.transaction_type === 'partner_deposit' || txn.transaction_type === 'income') {
+          return balance + txn.amount;
+        } else if (txn.transaction_type === 'partner_withdrawal' || txn.transaction_type === 'expense') {
+          return balance - txn.amount;
+        }
+        return balance;
+      }, data.opening_balance);
+
+      setAccount({ ...data, current_balance: calculatedBalance });
     } catch (error: any) {
       console.error('Error fetching account:', error);
       toast.error('Failed to load account details');
@@ -143,11 +189,17 @@ export default function FirmAccountDetails() {
 
   return (
     <div className="container mx-auto p-6">
-      <div className="flex items-center gap-4 mb-6">
-        <Button variant="ghost" size="icon" onClick={() => navigate('/firm-accounts')}>
-          <ArrowLeft className="h-5 w-5" />
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" onClick={() => navigate('/firm-accounts')}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
+          <h1 className="text-3xl font-bold">Account Statement - {account.account_name}</h1>
+        </div>
+        <Button onClick={() => setSendMoneyDialogOpen(true)}>
+          <Send className="h-4 w-4 mr-2" />
+          Send Money
         </Button>
-        <h1 className="text-3xl font-bold">Account Statement - {account.account_name}</h1>
       </div>
 
       <Card className="mb-6">
@@ -271,6 +323,14 @@ export default function FirmAccountDetails() {
         onOpenChange={setEditDialogOpen}
         transaction={selectedTransaction}
         onTransactionUpdated={handleTransactionUpdated}
+      />
+
+      <SendMoneyDialog
+        open={sendMoneyDialogOpen}
+        onOpenChange={setSendMoneyDialogOpen}
+        firmAccountId={account.id}
+        firmAccountName={account.account_name}
+        onMoneySent={handleTransactionUpdated}
       />
     </div>
   );

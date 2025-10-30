@@ -37,7 +37,32 @@ export default function FirmAccounts() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setAccounts(data || []);
+
+      // Calculate current_balance from transaction history for each account
+      const accountsWithCalculatedBalance = await Promise.all(
+        (data || []).map(async (account) => {
+          const { data: txns } = await supabase
+            .from('firm_transactions')
+            .select('amount, transaction_type')
+            .eq('firm_account_id', account.id);
+
+          const calculatedBalance = (txns || []).reduce((balance, txn) => {
+            if (txn.transaction_type === 'partner_deposit' || txn.transaction_type === 'income') {
+              return balance + txn.amount;
+            } else if (txn.transaction_type === 'partner_withdrawal' || txn.transaction_type === 'expense') {
+              return balance - txn.amount;
+            }
+            return balance;
+          }, account.opening_balance);
+
+          return {
+            ...account,
+            current_balance: calculatedBalance
+          };
+        })
+      );
+
+      setAccounts(accountsWithCalculatedBalance);
     } catch (error: any) {
       console.error('Error fetching accounts:', error);
       toast.error('Failed to load firm accounts');
@@ -74,14 +99,9 @@ export default function FirmAccounts() {
     <div className="container mx-auto p-6">
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center gap-4">
-         <Button 
-        variant="ghost" 
-        onClick={() => navigate('/')}
-        className="mb-4"
-      >
-        <ArrowLeft className="h-4 w-4 mr-2" />
-        Back to Dashboard
-      </Button>
+          <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
           <h1 className="text-3xl font-bold">Firm Accounts</h1>
         </div>
         <Button onClick={() => setShowAddDialog(true)}>
