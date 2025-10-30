@@ -111,82 +111,101 @@ export default function PartnerDetails() {
     }
   };
 
-  const fetchTransactions = async () => {
-    try {
-      // Fetch partner_transactions
-      const { data: partnerTxns, error: partnerError } = await supabase
-        .from('partner_transactions')
-        .select(`
-          id,
-          amount,
-          payment_date,
-          payment_mode,
-          notes,
-          mahajan_id,
-          mahajans (name)
-        `)
-        .eq('partner_id', id)
-        .order('payment_date', { ascending: false });
+const fetchTransactions = async () => {
+  try {
+    // Fetch partner_transactions
+    const { data: partnerTxns, error: partnerError } = await supabase
+      .from('partner_transactions')
+      .select(`
+        id,
+        amount,
+        payment_date,
+        payment_mode,
+        notes,
+        mahajan_id,
+        mahajans (name)
+      `)
+      .eq('partner_id', id)
+      .order('payment_date', { ascending: false });
 
-      if (partnerError) throw partnerError;
+    if (partnerError) throw partnerError;
 
-      // Fetch firm_transactions
-      const { data: firmTxns, error: firmError } = await supabase
-        .from('firm_transactions')
-        .select(`
-          id,
-          amount,
-          transaction_date,
-          description,
-          transaction_type,
-          firm_account_id,
-          firm_accounts (account_name)
-        `)
-        .eq('partner_id', id)
-        .order('transaction_date', { ascending: false });
+    // Fetch firm_transactions
+    const { data: firmTxns, error: firmError } = await supabase
+      .from('firm_transactions')
+      .select(`
+        id,
+        amount,
+        transaction_date,
+        description,
+        transaction_type,
+        firm_account_id,
+        firm_accounts (account_name)
+      `)
+      .eq('partner_id', id)
+      .order('transaction_date', { ascending: false });
 
-      if (firmError) throw firmError;
+    if (firmError) throw firmError;
 
-      // Format partner transactions
-      const formattedPartnerTxns = (partnerTxns || []).map(t => ({
+    // ✅ Format partner transactions
+    const formattedPartnerTxns = (partnerTxns || []).map(t => ({
+      id: t.id,
+      amount: t.amount, // stays same (partner initiated transaction)
+      payment_date: t.payment_date,
+      payment_mode: t.payment_mode,
+      notes: t.notes,
+      mahajan_name: t.mahajan_id ? ((t.mahajans as any)?.name || 'Unknown') : 'Firm Account',
+      source: 'partner' as const
+    }));
+
+    // ✅ Format firm transactions with proper logic for partner balance
+    const formattedFirmTxns = (firmTxns || []).map(t => {
+      let adjustedAmount = 0;
+
+      // Logic for handling partner’s balance
+      if (t.transaction_type === 'partner_deposit') {
+        // Money added to firm, deducted from partner
+        adjustedAmount = t.amount * -1;
+      } else if (t.transaction_type === 'partner_withdrawal') {
+        // Money given from firm to partner
+        adjustedAmount = Math.abs(t.amount);
+      } else if (t.transaction_type === 'expense') {
+        // Expense from firm, doesn't affect partner
+        adjustedAmount = -Math.abs(t.amount);
+      } else {
+        // Other transaction types (just in case)
+        adjustedAmount = Math.abs(t.amount);
+      }
+
+      return {
         id: t.id,
-        amount: t.amount,
-        payment_date: t.payment_date,
-        payment_mode: t.payment_mode,
-        notes: t.notes,
-        mahajan_name: t.mahajan_id ? ((t.mahajans as any)?.name || 'Unknown') : 'Firm Account',
-        source: 'partner' as const
-      }));
-
-      // Format firm transactions
-      const formattedFirmTxns = (firmTxns || []).map(t => ({
-        id: t.id,
-        amount: t.transaction_type === 'partner_withdrawal' || t.transaction_type === 'expense'
-          ? -Math.abs(t.amount)
-          : Math.abs(t.amount),
+        amount: adjustedAmount,
         payment_date: t.transaction_date,
         payment_mode: 'bank',
         notes: `${t.transaction_type} - ${t.description || 'No description'} (${(t.firm_accounts as any)?.account_name || 'Firm Account'})`,
         mahajan_name: 'Firm Account',
         source: 'firm' as const
-      }));
+      };
+    });
 
-      // Merge and sort
-      const allTransactions = [...formattedPartnerTxns, ...formattedFirmTxns]
-        .sort((a, b) => new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime());
+    // ✅ Merge and sort both sets
+    const allTransactions = [...formattedPartnerTxns, ...formattedFirmTxns].sort(
+      (a, b) => new Date(b.payment_date).getTime() - new Date(a.payment_date).getTime()
+    );
 
-      setTransactions(allTransactions);
+    // ✅ Set transactions for UI
+    setTransactions(allTransactions);
 
-      // ✅ Calculate total investment amount directly from the table
-      const calculatedTotal = allTransactions.reduce((sum, txn) => sum + txn.amount, 0);
+    // ✅ Calculate total investment for this partner
+    const calculatedTotal = allTransactions.reduce((sum, txn) => sum + txn.amount, 0);
 
-      // Update partner’s total investment dynamically
-      setPartner(prev => prev ? { ...prev, total_invested: calculatedTotal } : prev);
-    } catch (error: any) {
-      console.error('Error fetching transactions:', error);
-      toast.error('Failed to load transactions');
-    }
-  };
+    // ✅ Update partner’s total investment dynamically
+    setPartner(prev => (prev ? { ...prev, total_invested: calculatedTotal } : prev));
+  } catch (error: any) {
+    console.error('Error fetching transactions:', error);
+    toast.error('Failed to load transactions');
+  }
+};
 
   const handlePaymentAdded = () => {
     fetchPartnerDetails();
