@@ -14,6 +14,7 @@ interface Partner {
   email: string | null;
   address: string | null;
   total_invested: number;
+  balance: number; // ✅ added
 }
 
 export default function Partners() {
@@ -35,43 +36,42 @@ export default function Partners() {
 
       if (error) throw error;
 
-      // ✅ Calculate total balance dynamically for each partner
-      const partnersWithBalances = await Promise.all(
+      const partnersWithStats = await Promise.all(
         (data || []).map(async (partner) => {
-          const [partnerTxns, firmTxns] = await Promise.all([
-            supabase
-              .from('partner_transactions')
-              .select('amount')
-              .eq('partner_id', partner.id),
-            supabase
-              .from('firm_transactions')
-              .select('amount, transaction_type')
-              .eq('partner_id', partner.id),
-          ]);
+          // Fetch all transactions related to this partner
+          const { data: partnerTxns } = await supabase
+            .from('partner_transactions')
+            .select('amount, transaction_type')
+            .eq('partner_id', partner.id);
 
-          if (partnerTxns.error) throw partnerTxns.error;
-          if (firmTxns.error) throw firmTxns.error;
+          const { data: firmTxns } = await supabase
+            .from('firm_transactions')
+            .select('amount, transaction_type')
+            .eq('partner_id', partner.id);
 
-          // Calculate totals
-          const partnerTotal = (partnerTxns.data || []).reduce(
-            (sum, txn) => sum + txn.amount,
-            0
-          );
+          // Combine transactions
+          const allTxns = [...(partnerTxns || []), ...(firmTxns || [])];
 
-          const firmTotal = (firmTxns.data || []).reduce((sum, txn) => {
-            if (txn.transaction_type === 'partner_deposit') return sum + txn.amount;
-            if (txn.transaction_type === 'partner_withdrawal') return sum - txn.amount;
-            return sum;
-          }, 0);
+          // Calculate total investment and balance
+          let total_invested = 0;
+          let total_withdrawn = 0;
+
+          allTxns.forEach(txn => {
+            if (txn.amount > 0) total_invested += txn.amount;
+            else total_withdrawn += Math.abs(txn.amount);
+          });
+
+          const balance = total_invested - total_withdrawn;
 
           return {
             ...partner,
-            total_invested: partnerTotal + firmTotal,
+            total_invested,
+            balance,
           };
         })
       );
 
-      setPartners(partnersWithBalances);
+      setPartners(partnersWithStats);
     } catch (error: any) {
       console.error('Error fetching partners:', error);
       toast.error('Failed to load partners');
