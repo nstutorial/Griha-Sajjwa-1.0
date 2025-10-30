@@ -26,13 +26,17 @@ export function PartnersList({ partners }: { partners: Partner[] }) {
             <CardTitle className="flex justify-between items-center">
               <span>{partner.name}</span>
               {/* ✅ Show balance color-coded */}
-              <span
-                className={`text-sm font-semibold ${
-                  partner.total_invested >= 0 ? "text-green-600" : "text-red-600"
-                }`}
-              >
-                ₹{partner.total_invested.toFixed(2)}
-              </span>
+             <span>{partner.name}</span>
+
+{/* ✅ Show balance with proper sign and color */}
+<span
+  className={`text-sm font-semibold ${
+    partner.balance < 0 ? "text-red-600" : "text-green-600"
+  }`}
+>
+  {partner.balance < 0 ? `-₹${Math.abs(partner.balance).toFixed(2)}` : `₹${partner.balance.toFixed(2)}`}
+</span>
+
               <p>
   <strong>Balance:</strong>{' '}
   <span className={partner.balance < 0 ? 'text-red-600 font-semibold' : 'text-green-600 font-semibold'}>
