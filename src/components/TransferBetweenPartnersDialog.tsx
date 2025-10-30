@@ -76,10 +76,10 @@ export function TransferBetweenPartnersDialog({
         .from('partner_transactions')
         .insert({
           partner_id: fromPartnerId,
-          amount: -amount,
+          amount: amount,
           payment_date: formData.payment_date,
           payment_mode: formData.payment_mode,
-          notes: `Transfer to ${partners.find(p => p.id === formData.to_partner_id)?.name || 'partner'}: ${formData.notes || 'Money transfer'}`
+          notes: `Transfer/Paid to ${partners.find(p => p.id === formData.to_partner_id)?.name || 'partner'}: ${formData.notes || 'Money transfer'}`
         });
 
       if (withdrawalError) throw withdrawalError;
@@ -89,10 +89,10 @@ export function TransferBetweenPartnersDialog({
         .from('partner_transactions')
         .insert({
           partner_id: formData.to_partner_id,
-          amount: amount,
+          amount: -amount,
           payment_date: formData.payment_date,
           payment_mode: formData.payment_mode,
-          notes: `Transfer from ${fromPartnerName}: ${formData.notes || 'Money transfer'}`
+          notes: `Transfer/Paid from ${fromPartnerName}: ${formData.notes || 'Money transfer'}`
         });
 
       if (depositError) throw depositError;
