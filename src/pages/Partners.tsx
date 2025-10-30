@@ -35,33 +35,43 @@ export default function Partners() {
 
       if (error) throw error;
 
-      // Calculate total_invested from transaction history for each partner
-      const partnersWithCalculatedInvestment = await Promise.all(
+      // ✅ Calculate total balance dynamically for each partner
+      const partnersWithBalances = await Promise.all(
         (data || []).map(async (partner) => {
-          // Fetch partner_transactions
-          const { data: partnerTxns } = await supabase
-            .from('partner_transactions')
-            .select('amount')
-            .eq('partner_id', partner.id);
+          const [partnerTxns, firmTxns] = await Promise.all([
+            supabase
+              .from('partner_transactions')
+              .select('amount')
+              .eq('partner_id', partner.id),
+            supabase
+              .from('firm_transactions')
+              .select('amount, transaction_type')
+              .eq('partner_id', partner.id),
+          ]);
 
-          // Fetch firm_transactions where this partner received money
-          const { data: firmTxns } = await supabase
-            .from('firm_transactions')
-            .select('amount')
-            .eq('partner_id', partner.id)
-            .eq('transaction_type', 'partner_deposit');
+          if (partnerTxns.error) throw partnerTxns.error;
+          if (firmTxns.error) throw firmTxns.error;
 
-          const partnerTxnTotal = (partnerTxns || []).reduce((sum, txn) => sum + txn.amount, 0);
-          const firmTxnTotal = (firmTxns || []).reduce((sum, txn) => sum + txn.amount, 0);
+          // Calculate totals
+          const partnerTotal = (partnerTxns.data || []).reduce(
+            (sum, txn) => sum + txn.amount,
+            0
+          );
+
+          const firmTotal = (firmTxns.data || []).reduce((sum, txn) => {
+            if (txn.transaction_type === 'partner_deposit') return sum + txn.amount;
+            if (txn.transaction_type === 'partner_withdrawal') return sum - txn.amount;
+            return sum;
+          }, 0);
 
           return {
             ...partner,
-            total_invested: partnerTxnTotal + firmTxnTotal
+            total_invested: partnerTotal + firmTotal,
           };
         })
       );
 
-      setPartners(partnersWithCalculatedInvestment);
+      setPartners(partnersWithBalances);
     } catch (error: any) {
       console.error('Error fetching partners:', error);
       toast.error('Failed to load partners');
