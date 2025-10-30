@@ -33,6 +33,13 @@ export function PartnersList({ partners }: { partners: Partner[] }) {
               >
                 ₹{partner.total_invested.toFixed(2)}
               </span>
+              <p>
+  <strong>Balance:</strong>{' '}
+  <span className={partner.balance < 0 ? 'text-red-600 font-semibold' : 'text-green-600 font-semibold'}>
+    ₹{partner.balance.toFixed(2)}
+  </span>
+</p>
+
             </CardTitle>
           </CardHeader>
           <CardContent>
