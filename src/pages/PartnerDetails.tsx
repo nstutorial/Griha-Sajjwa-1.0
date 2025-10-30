@@ -172,6 +172,9 @@ const fetchTransactions = async () => {
       } else if (t.transaction_type === 'expense') {
         // Expense from firm, doesn't affect partner
         adjustedAmount = -Math.abs(t.amount);
+      } else if (t.transaction_type === 'refund') {
+        // Expense from firm, doesn't affect partner
+        adjustedAmount = -Math.abs(t.amount);  
       } else {
         // Other transaction types (just in case)
         adjustedAmount = Math.abs(t.amount);
