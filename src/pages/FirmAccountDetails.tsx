@@ -276,12 +276,14 @@ export default function FirmAccountDetails() {
                     </TableCell>
                     <TableCell className={`text-right font-medium ${
                       transaction.transaction_type === 'partner_withdrawal' || 
-                      transaction.transaction_type === 'expense' 
+                      transaction.transaction_type === 'expense' ||
+                       transaction.transaction_type === 'refund' 
                         ? 'text-destructive' 
                         : 'text-green-600'
                     }`}>
                       {transaction.transaction_type === 'partner_withdrawal' || 
-                       transaction.transaction_type === 'expense' 
+                       transaction.transaction_type === 'expense'  ||
+                        transaction.transaction_type === 'refund'  
                         ? '-' 
                         : '+'}
                       ₹{transaction.amount.toFixed(2)}
