@@ -1,6 +1,6 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { useNavigate } from 'react-router-dom';
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { useNavigate } from "react-router-dom";
 
 interface Partner {
   id: string;
@@ -11,32 +11,53 @@ interface Partner {
   total_invested: number;
 }
 
-interface PartnersListProps {
-  partners: Partner[];
-}
-
-export function PartnersList({ partners }: PartnersListProps) {
+export function PartnersList({ partners }: { partners: Partner[] }) {
   const navigate = useNavigate();
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {partners.map((partner) => (
-        <Card key={partner.id} className="cursor-pointer hover:shadow-lg transition-shadow"
-              onClick={() => navigate(`/partners/${partner.id}`)}>
+        <Card 
+          key={partner.id} 
+          className="hover:shadow-lg transition-shadow cursor-pointer"
+          onClick={() => navigate(`/partners/${partner.id}`)}
+        >
           <CardHeader>
-            <CardTitle className="text-lg">{partner.name}</CardTitle>
+            <CardTitle className="flex justify-between items-center">
+              <span>{partner.name}</span>
+              {/* ✅ Show balance color-coded */}
+              <span
+                className={`text-sm font-semibold ${
+                  partner.total_invested >= 0 ? "text-green-600" : "text-red-600"
+                }`}
+              >
+                ₹{partner.total_invested.toFixed(2)}
+              </span>
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2 text-sm">
-              {partner.phone && (
-                <p className="text-muted-foreground">Phone: {partner.phone}</p>
-              )}
-              {partner.email && (
-                <p className="text-muted-foreground">Email: {partner.email}</p>
-              )}
-              <p className="text-lg font-semibold mt-2">
-                Total Invested: ₹{partner.total_invested.toFixed(2)}
+            {partner.phone && (
+              <p className="text-sm">
+                <span className="font-medium">Phone:</span> {partner.phone}
               </p>
+            )}
+            {partner.email && (
+              <p className="text-sm">
+                <span className="font-medium">Email:</span> {partner.email}
+              </p>
+            )}
+            {partner.address && (
+              <p className="text-sm">
+                <span className="font-medium">Address:</span> {partner.address}
+              </p>
+            )}
+            <div className="mt-3">
+              <Button size="sm" onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/partners/${partner.id}`);
+              }}>
+                View Details
+              </Button>
             </div>
           </CardContent>
         </Card>
