@@ -15,27 +15,39 @@ interface Transaction {
   payment_date: string;
   payment_mode: 'bank' | 'cash';
   notes?: string;
+  bill?: {
+    bill_number?: string;
+    description?: string;
+  };
 }
 
 const SearchTransactionById = ({ transactions }: { transactions: Transaction[] }) => {
-  const [searchId, setSearchId] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
   const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
   const [editTransaction, setEditTransaction] = useState<Transaction | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
   const [deleteLoading, setDeleteLoading] = useState(false);
 
-  // 🔍 Search by Primary Key (id)
+  // 🔍 Search by Reference Number only (8-digit payment reference)
   const handleSearch = () => {
-    const idTerm = searchId.trim();
-    if (!idTerm) {
-      toast.error('Please enter a transaction ID to search');
+    const term = searchTerm.trim();
+    if (!term) {
+      toast.error('Please enter a reference number');
       setFilteredTransactions([]);
       return;
     }
 
-    const result = transactions.filter((t) => t.id.toLowerCase() === idTerm.toLowerCase());
-    if (result.length === 0) toast.error('No matching transactions found');
+    // Search only by reference number in notes field
+    const result = transactions.filter((t) => {
+      const notes = t.notes || '';
+      // Look for REF#12345678 pattern
+      return notes.includes(`REF#${term}`);
+    });
+    
+    if (result.length === 0) {
+      toast.error('No payment found with this reference number');
+    }
 
     setFilteredTransactions(result);
     setCurrentPage(1);
@@ -108,7 +120,7 @@ const SearchTransactionById = ({ transactions }: { transactions: Transaction[] }
   const paginatedTransactions = filteredTransactions.slice(startIndex, startIndex + itemsPerPage);
 
   const handleReset = () => {
-    setSearchId('');
+    setSearchTerm('');
     setFilteredTransactions([]);
     setCurrentPage(1);
   };
@@ -119,9 +131,11 @@ const SearchTransactionById = ({ transactions }: { transactions: Transaction[] }
       <div className="flex items-center space-x-2">
         <Input
           type="text"
-          placeholder="Search by Transaction ID"
-          value={searchId}
-          onChange={(e) => setSearchId(e.target.value)}
+          placeholder="Enter 8-digit payment reference number"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+          maxLength={8}
         />
         <Button onClick={handleSearch}>Search</Button>
         <Button variant="outline" onClick={handleReset}>
@@ -196,8 +210,8 @@ const SearchTransactionById = ({ transactions }: { transactions: Transaction[] }
           )}
         </>
       ) : (
-        <p className="text-center text-gray-500 pt-6">
-          No transactions to display. Please search using a transaction ID.
+        <p className="text-center text-muted-foreground pt-6">
+          No transactions to display. Enter a payment reference number to find all transactions from that payment.
         </p>
       )}
 

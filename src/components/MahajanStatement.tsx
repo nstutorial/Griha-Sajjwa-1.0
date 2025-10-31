@@ -197,32 +197,67 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
       }
     });
 
-    // Add payments paid
+    // Group transactions by date and payment mode
+    const transactionsByDate = new Map<string, BillTransaction[]>();
+    
     transactions.forEach(transaction => {
       const paymentDate = new Date(transaction.payment_date);
       const isInRange = (!startDate || paymentDate >= new Date(startDate)) && 
                        (!endDate || paymentDate <= new Date(endDate));
 
       if (isInRange) {
-        // Extract partner name from notes if present
-        let partnerInfo = '';
-        if (transaction.notes && transaction.notes.includes('Payment from partner:')) {
-          const partnerMatch = transaction.notes.match(/Payment from partner: ([^-]+)/);
-          if (partnerMatch) {
-            partnerInfo = ` [Partner: ${partnerMatch[1].trim()}]`;
-          }
+        const key = `${transaction.payment_date}-${transaction.transaction_type}-${transaction.payment_mode}`;
+        if (!transactionsByDate.has(key)) {
+          transactionsByDate.set(key, []);
         }
-
-        allEntries.push({
-          date: transaction.payment_date,
-          description: `Paid - ${transaction.bill.description || 'Bill'} (${transaction.bill.bill_number}) - ${transaction.transaction_type} via ${transaction.payment_mode}${partnerInfo}${transaction.notes && !transaction.notes.includes('Payment from partner:') ? ' - ' + transaction.notes : ''}`,
-          reference: transaction.id,
-          debit: 0,
-          credit: transaction.amount,
-          balance: 0, // Will be calculated after sorting
-          type: 'payment_paid'
-        });
+        transactionsByDate.get(key)!.push(transaction);
       }
+    });
+
+    // Create consolidated payment entries
+    transactionsByDate.forEach((groupedTransactions, key) => {
+      const firstTransaction = groupedTransactions[0];
+      const totalAmount = groupedTransactions.reduce((sum, t) => sum + t.amount, 0);
+      
+      // Extract reference number from notes
+      let referenceNumber = '';
+      if (firstTransaction.notes) {
+        const refMatch = firstTransaction.notes.match(/REF#(\d{8})/);
+        if (refMatch) {
+          referenceNumber = refMatch[1];
+        }
+      }
+      
+      // Build description with all bill details
+      let description = `Payment Received`;
+      
+      // Extract partner info if present
+      let partnerInfo = '';
+      if (firstTransaction.notes && firstTransaction.notes.includes('Payment from partner:')) {
+        const partnerMatch = firstTransaction.notes.match(/Payment from partner: ([^-]+)/);
+        if (partnerMatch) {
+          partnerInfo = ` from ${partnerMatch[1].trim()}`;
+        }
+      }
+      
+      description += partnerInfo;
+      
+      // Add bill details
+      const billDetails = groupedTransactions.map(t => 
+        `₹${t.amount.toFixed(2)} for payment of ${t.bill.bill_number}`
+      ).join('\n');
+      
+      description += '\n' + billDetails;
+
+      allEntries.push({
+        date: firstTransaction.payment_date,
+        description: description,
+        reference: referenceNumber || 'N/A',
+        debit: 0,
+        credit: totalAmount,
+        balance: 0, // Will be calculated after sorting
+        type: 'payment_paid'
+      });
     });
 
     // Sort by date in ascending order
@@ -548,7 +583,7 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
                       <td className="p-3 text-sm">{format(new Date(entry.date), 'dd/MM/yyyy')}</td>
                       <td className="p-3">
                         <div className="flex items-center gap-2">
-                          <span>{entry.description}</span>
+                          <span className="whitespace-pre-line">{entry.description}</span>
                           <Badge 
                             variant={
                               entry.type === 'bill_disbursement' ? 'destructive' :
