@@ -15,6 +15,7 @@ import PasswordManagement from "./pages/PasswordManagement";
 import Reminders from "./pages/Reminders";
 import BillReminders from "./pages/BillReminders";
 import BillCustomers from "./pages/BillCustomers";
+import BillCustomerDetails from "./pages/BillCustomerDetails";
 import Partners from "./pages/Partners";
 import PartnerDetails from "./pages/PartnerDetails";
 import FirmAccounts from "./pages/FirmAccounts";
@@ -116,6 +117,11 @@ const AppRoutes = () => {
       <Route path="/bill-customers" element={
         <ProtectedRoute>
           <BillCustomers />
+        </ProtectedRoute>
+      } />
+      <Route path="/bill-customers/:id" element={
+        <ProtectedRoute>
+          <BillCustomerDetails />
         </ProtectedRoute>
       } />
       <Route path="/partners" element={
