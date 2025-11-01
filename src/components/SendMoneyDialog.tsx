@@ -27,6 +27,11 @@ interface Mahajan {
   name: string;
 }
 
+interface CustomTransactionType {
+  id: string;
+  name: string;
+}
+
 export function SendMoneyDialog({
   open,
   onOpenChange,
@@ -38,10 +43,11 @@ export function SendMoneyDialog({
   const [loading, setLoading] = useState(false);
   const [partners, setPartners] = useState<Partner[]>([]);
   const [mahajans, setMahajans] = useState<Mahajan[]>([]);
+  const [customTypes, setCustomTypes] = useState<CustomTransactionType[]>([]);
   const [formData, setFormData] = useState({
     recipient_type: 'partner' as 'partner' | 'mahajan',
     recipient_id: '',
-    transaction_type: 'partner_deposit',
+    transaction_type: 'expense',
     amount: '',
     transaction_date: new Date().toISOString().split('T')[0],
     description: ''
@@ -50,8 +56,57 @@ export function SendMoneyDialog({
   useEffect(() => {
     if (open && user) {
       fetchRecipients();
+      fetchCustomTypes();
     }
   }, [open, user]);
+
+  const getTransactionTypeLabel = (type: string) => {
+    const labels: Record<string, string> = {
+      partner_deposit: 'Partner Deposit',
+      partner_withdrawal: 'Partner Withdrawal',
+      expense: 'Expense',
+      income: 'Income',
+      refund: 'Refund',
+      adjustment: 'Adjustment',
+      gst_tax_payment: 'GST Tax Payment',
+      income_tax_payment: 'Income Tax Payment',
+      paid_to_ca: 'Paid To CA',
+      paid_to_supplier: 'Paid To Supplier'
+    };
+    
+    if (labels[type]) return labels[type];
+    
+    // Handle custom types
+    const customType = customTypes.find(ct => `custom_${ct.id}` === type);
+    if (customType) return customType.name;
+    
+    return type;
+  };
+
+  const fetchCustomTypes = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('custom_transaction_types')
+        .select('id, name')
+        .eq('user_id', user?.id)
+        .order('name');
+
+      if (error) throw error;
+      
+      // Filter out custom types that conflict with standard transaction types
+      const standardTypes = ['partner_deposit', 'partner_withdrawal', 'expense', 'income', 
+                            'refund', 'adjustment', 'gst_tax_payment', 'income_tax_payment', 
+                            'paid_to_ca', 'paid_to_supplier'];
+      const filtered = (data || []).filter(ct => {
+        const slug = ct.name.toLowerCase().replace(/\s+/g, '_');
+        return !standardTypes.includes(slug);
+      });
+      
+      setCustomTypes(filtered);
+    } catch (error: any) {
+      console.error('Error fetching custom types:', error);
+    }
+  };
 
   const fetchRecipients = async () => {
     try {
@@ -81,6 +136,18 @@ export function SendMoneyDialog({
     setLoading(true);
     try {
       const amount = parseFloat(formData.amount);
+      
+      // Map custom types and special types to 'expense' for database compliance
+      let transactionType = formData.transaction_type;
+      if (transactionType.startsWith('custom_') || 
+          ['gst_tax_payment', 'income_tax_payment', 'paid_to_ca', 'paid_to_supplier'].includes(transactionType)) {
+        transactionType = 'expense';
+      }
+
+      const transactionTypeLabel = getTransactionTypeLabel(formData.transaction_type);
+      const recipientName = formData.recipient_type === 'partner' 
+        ? partners.find(p => p.id === formData.recipient_id)?.name
+        : mahajans.find(m => m.id === formData.recipient_id)?.name;
 
       if (formData.recipient_type === 'partner') {
         // Create firm transaction for partner
@@ -89,24 +156,25 @@ export function SendMoneyDialog({
           .insert({
             firm_account_id: firmAccountId,
             partner_id: formData.recipient_id,
-            transaction_type: formData.transaction_type,
+            transaction_type: transactionType,
             amount: amount,
             transaction_date: formData.transaction_date,
-            description: formData.description || `Money sent to partner from ${firmAccountName}`
+            description: formData.description || `${transactionTypeLabel} - Money sent to ${recipientName} from ${firmAccountName}`
           });
 
         if (firmError) throw firmError;
       } else {
-        // For mahajan: record firm transaction
+        // For mahajan: record firm transaction with mahajan_id
         const { error: firmError } = await supabase
           .from('firm_transactions')
           .insert({
             firm_account_id: firmAccountId,
+            mahajan_id: formData.recipient_id,
             partner_id: null,
-            transaction_type: formData.transaction_type,
+            transaction_type: transactionType,
             amount: amount,
             transaction_date: formData.transaction_date,
-            description: formData.description || `Payment to mahajan: ${mahajans.find(m => m.id === formData.recipient_id)?.name} from ${firmAccountName}`
+            description: formData.description || `${transactionTypeLabel} - Payment to ${recipientName} from ${firmAccountName}`
           });
 
         if (firmError) throw firmError;
@@ -116,7 +184,7 @@ export function SendMoneyDialog({
       setFormData({
         recipient_type: 'partner',
         recipient_id: '',
-        transaction_type: 'partner_deposit',
+        transaction_type: 'expense',
         amount: '',
         transaction_date: new Date().toISOString().split('T')[0],
         description: ''
@@ -194,10 +262,19 @@ export function SendMoneyDialog({
               <SelectContent>
                 <SelectItem value="partner_deposit">Partner Deposit</SelectItem>
                 <SelectItem value="partner_withdrawal">Partner Withdrawal</SelectItem>
-                 <SelectItem value="refund">Refund</SelectItem>
                 <SelectItem value="expense">Expense</SelectItem>
                 <SelectItem value="income">Income</SelectItem>
+                <SelectItem value="refund">Refund</SelectItem>
                 <SelectItem value="adjustment">Adjustment</SelectItem>
+                <SelectItem value="gst_tax_payment">GST Tax Payment</SelectItem>
+                <SelectItem value="income_tax_payment">Income Tax Payment</SelectItem>
+                <SelectItem value="paid_to_ca">Paid To CA</SelectItem>
+                <SelectItem value="paid_to_supplier">Paid To Supplier</SelectItem>
+                {customTypes.map((type) => (
+                  <SelectItem key={type.id} value={`custom_${type.id}`}>
+                    {type.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

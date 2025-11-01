@@ -47,6 +47,14 @@ interface BillTransaction {
   };
 }
 
+interface FirmTransaction {
+  id: string;
+  amount: number;
+  transaction_date: string;
+  transaction_type: string;
+  description: string | null;
+}
+
 interface StatementEntry {
   date: string;
   description: string;
@@ -54,7 +62,7 @@ interface StatementEntry {
   debit: number;
   credit: number;
   balance: number;
-  type: 'bill_disbursement' | 'payment_paid' | 'interest_accrued';
+  type: 'bill_disbursement' | 'payment_paid' | 'interest_accrued' | 'firm_payment';
 }
 
 interface MahajanStatementProps {
@@ -66,6 +74,7 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
   const { toast } = useToast();
   const [bills, setBills] = useState<Bill[]>([]);
   const [transactions, setTransactions] = useState<BillTransaction[]>([]);
+  const [firmTransactions, setFirmTransactions] = useState<FirmTransaction[]>([]);
   const [statement, setStatement] = useState<StatementEntry[]>([]);
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
@@ -78,10 +87,10 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
   }, [user, mahajan.id]);
 
   useEffect(() => {
-    if (bills.length > 0) {
+    if (bills.length > 0 || firmTransactions.length > 0) {
       generateStatement();
     }
-  }, [bills, transactions, startDate, endDate]);
+  }, [bills, transactions, firmTransactions, startDate, endDate]);
 
   // Realtime subscriptions for partner transaction updates
   useEffect(() => {
@@ -138,6 +147,15 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
 
       if (billsError) throw billsError;
 
+      // Fetch firm transactions for this mahajan
+      const { data: firmTransData, error: firmTransError } = await supabase
+        .from('firm_transactions')
+        .select('*')
+        .eq('mahajan_id', mahajan.id)
+        .order('transaction_date', { ascending: true });
+
+      if (firmTransError) throw firmTransError;
+
       let transactionsData: BillTransaction[] = [];
 
       // Fetch transactions (only if there are bills)
@@ -155,9 +173,10 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
         transactionsData = transData || [];
       }
 
-      // Update both states together after all data is fetched
+      // Update all states together after all data is fetched
       setTransactions(transactionsData);
       setBills(billsData || []);
+      setFirmTransactions(firmTransData || []);
 
     } catch (error) {
       console.error('Error fetching mahajan data:', error);
@@ -258,6 +277,25 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
         balance: 0, // Will be calculated after sorting
         type: 'payment_paid'
       });
+    });
+
+    // Add firm transactions
+    firmTransactions.forEach(firmTrans => {
+      const transDate = new Date(firmTrans.transaction_date);
+      const isInRange = (!startDate || transDate >= new Date(startDate)) && 
+                       (!endDate || transDate <= new Date(endDate));
+
+      if (isInRange) {
+        allEntries.push({
+          date: firmTrans.transaction_date,
+          description: `Firm Payment - ${firmTrans.description || 'Payment from firm account'}`,
+          reference: 'FIRM',
+          debit: 0,
+          credit: firmTrans.amount,
+          balance: 0, // Will be calculated after sorting
+          type: 'firm_payment'
+        });
+      }
     });
 
     // Sort by date in ascending order
@@ -585,14 +623,16 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
                         <div className="flex items-center gap-2">
                           <span className="whitespace-pre-line">{entry.description}</span>
                           <Badge 
-                            variant={
+                             variant={
                               entry.type === 'bill_disbursement' ? 'destructive' :
-                              entry.type === 'payment_paid' ? 'default' : 'secondary'
+                              entry.type === 'payment_paid' ? 'default' :
+                              entry.type === 'firm_payment' ? 'secondary' : 'secondary'
                             }
                             className="text-xs"
                           >
                             {entry.type === 'bill_disbursement' ? 'Bill' :
-                             entry.type === 'payment_paid' ? 'Payment' : 'Interest'}
+                             entry.type === 'payment_paid' ? 'Payment' :
+                             entry.type === 'firm_payment' ? 'Firm Payment' : 'Interest'}
                           </Badge>
                         </div>
                       </td>

@@ -3,13 +3,19 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft, Edit, Trash2, Send } from 'lucide-react';
+import { ArrowLeft, Edit, Trash2, Send, Download, FileSpreadsheet, Search, ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { useControl } from '@/contexts/ControlContext';
 import { EditFirmTransactionDialog } from '@/components/EditFirmTransactionDialog';
 import { SendMoneyDialog } from '@/components/SendMoneyDialog';
+import { Input } from '@/components/ui/input';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { PDFDownloader } from '@/lib/pdf-download';
+import * as XLSX from 'xlsx';
+import { CustomTransactionTypeManager } from '@/components/CustomTransactionTypeManager';
 
 interface FirmAccount {
   id: string;
@@ -28,6 +34,7 @@ interface Transaction {
   transaction_type: string;
   amount: number;
   partner_id: string | null;
+  mahajan_id: string | null;
   description: string | null;
   transaction_date: string;
   created_at: string;
@@ -42,12 +49,25 @@ export default function FirmAccountDetails() {
   const [loading, setLoading] = useState(true);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [sendMoneyDialogOpen, setSendMoneyDialogOpen] = useState(false);
+  const [customTypeDialogOpen, setCustomTypeDialogOpen] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [typeSummary, setTypeSummary] = useState<Record<string, { count: number; total: number }>>({});
+  const [customTypes, setCustomTypes] = useState<Record<string, string>>({});
+  const [partners, setPartners] = useState<Record<string, string>>({});
+  const [mahajans, setMahajans] = useState<Record<string, string>>({});
+  const itemsPerPage = 20;
 
   useEffect(() => {
     if (id) {
       fetchAccountDetails();
       fetchTransactions();
+      fetchCustomTypes();
+      fetchPartners();
+      fetchMahajans();
     }
   }, [id]);
 
@@ -124,9 +144,78 @@ export default function FirmAccountDetails() {
 
       if (error) throw error;
       setTransactions(data || []);
+      
+      // Calculate summary by type
+      const summary: Record<string, { count: number; total: number }> = {};
+      (data || []).forEach(txn => {
+        if (!summary[txn.transaction_type]) {
+          summary[txn.transaction_type] = { count: 0, total: 0 };
+        }
+        summary[txn.transaction_type].count++;
+        summary[txn.transaction_type].total += txn.amount;
+      });
+      setTypeSummary(summary);
     } catch (error: any) {
       console.error('Error fetching transactions:', error);
       toast.error('Failed to load transactions');
+    }
+  };
+
+  const fetchCustomTypes = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('custom_transaction_types')
+        .select('*');
+
+      if (error) throw error;
+      
+      const typesMap: Record<string, string> = {};
+      (data || []).forEach(type => {
+        // Store with the exact name as key
+        typesMap[type.name] = type.name;
+        // Also store snake_case version
+        const snakeCase = type.name.toLowerCase().replace(/\s+/g, '_');
+        typesMap[snakeCase] = type.name;
+      });
+      setCustomTypes(typesMap);
+    } catch (error: any) {
+      console.error('Error fetching custom types:', error);
+    }
+  };
+
+  const fetchPartners = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('partners')
+        .select('id, name');
+
+      if (error) throw error;
+      
+      const partnersMap: Record<string, string> = {};
+      (data || []).forEach(partner => {
+        partnersMap[partner.id] = partner.name;
+      });
+      setPartners(partnersMap);
+    } catch (error: any) {
+      console.error('Error fetching partners:', error);
+    }
+  };
+
+  const fetchMahajans = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('mahajans')
+        .select('id, name');
+
+      if (error) throw error;
+      
+      const mahajansMap: Record<string, string> = {};
+      (data || []).forEach(mahajan => {
+        mahajansMap[mahajan.id] = mahajan.name;
+      });
+      setMahajans(mahajansMap);
+    } catch (error: any) {
+      console.error('Error fetching mahajans:', error);
     }
   };
 
@@ -169,15 +258,140 @@ export default function FirmAccountDetails() {
   };
 
   const getTransactionTypeLabel = (type: string) => {
+    // First check predefined types
     const labels: Record<string, string> = {
       partner_deposit: 'Partner Deposit',
       partner_withdrawal: 'Partner Withdrawal',
       refund: 'Refund',
       expense: 'Expense',
       income: 'Income',
-      adjustment: 'Adjustment'
+      adjustment: 'Adjustment',
+      gst_tax_payment: 'GST Tax Payment',
+      income_tax_payment: 'Income Tax Payment',
+      paid_to_ca: 'Paid To CA',
+      paid_to_supplier: 'Paid To Supplier'
     };
-    return labels[type] || type;
+    
+    if (labels[type]) return labels[type];
+    
+    // Check if it's a custom type (exact match or snake_case match)
+    if (customTypes[type]) return customTypes[type];
+    
+    // Format snake_case to Title Case as fallback
+    return type.split('_').map(word => 
+      word.charAt(0).toUpperCase() + word.slice(1)
+    ).join(' ');
+  };
+
+  const getTransactionDescription = (txn: Transaction) => {
+    const parts: string[] = [];
+    
+    // Add partner information if available
+    if (txn.partner_id && partners[txn.partner_id]) {
+      parts.push(`Partner: ${partners[txn.partner_id]}`);
+    }
+    
+    // Add mahajan information if available
+    if (txn.mahajan_id && mahajans[txn.mahajan_id]) {
+      parts.push(`Mahajan: ${mahajans[txn.mahajan_id]}`);
+    }
+    
+    // Add the transaction description/notes
+    if (txn.description) {
+      parts.push(`Notes: ${txn.description}`);
+    }
+    
+    return parts.length > 0 ? parts.join(', ') : '-';
+  };
+
+  // Filter transactions based on search and date
+  const filteredTransactions = transactions.filter(txn => {
+    const matchesSearch = searchQuery === '' || 
+      getTransactionTypeLabel(txn.transaction_type).toLowerCase().includes(searchQuery.toLowerCase()) ||
+      getTransactionDescription(txn).toLowerCase().includes(searchQuery.toLowerCase()) ||
+      txn.amount.toString().includes(searchQuery) ||
+      format(new Date(txn.transaction_date), 'dd MMM yyyy').toLowerCase().includes(searchQuery.toLowerCase());
+    
+    const matchesDateRange = 
+      (!startDate || new Date(txn.transaction_date) >= new Date(startDate)) &&
+      (!endDate || new Date(txn.transaction_date) <= new Date(endDate));
+    
+    return matchesSearch && matchesDateRange;
+  });
+
+  // Pagination
+  const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
+  const paginatedTransactions = filteredTransactions.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, startDate, endDate]);
+
+  const handleExportPDF = async () => {
+    if (!account) return;
+    
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    
+    doc.setFontSize(18);
+    doc.text('Firm Account Statement', pageWidth / 2, 15, { align: 'center' });
+    
+    doc.setFontSize(12);
+    doc.text(`Account: ${account.account_name}`, 14, 25);
+    doc.text(`Type: ${account.account_type.charAt(0).toUpperCase() + account.account_type.slice(1)}`, 14, 32);
+    doc.text(`Current Balance: ₹${account.current_balance.toFixed(2)}`, 14, 39);
+    
+    let yPos = 50;
+    doc.setFontSize(14);
+    doc.text('Transaction Summary', 14, yPos);
+    yPos += 7;
+    
+    doc.setFontSize(10);
+    Object.entries(typeSummary).forEach(([type, data]) => {
+      doc.text(`${getTransactionTypeLabel(type)}: ${data.count} transactions, ₹${data.total.toFixed(2)}`, 14, yPos);
+      yPos += 6;
+    });
+    
+    yPos += 5;
+    
+    autoTable(doc, {
+      startY: yPos,
+      head: [['Date', 'Type', 'Description', 'Amount']],
+      body: filteredTransactions.map(txn => [
+        format(new Date(txn.transaction_date), 'dd MMM yyyy'),
+        getTransactionTypeLabel(txn.transaction_type),
+        getTransactionDescription(txn),
+        `${txn.transaction_type === 'partner_withdrawal' || txn.transaction_type === 'expense' || txn.transaction_type === 'refund' ? '-' : '+'}₹${txn.amount.toFixed(2)}`
+      ]),
+      theme: 'striped',
+      headStyles: { fillColor: [59, 130, 246] }
+    });
+    
+    const pdfBlob = doc.output('blob');
+    await PDFDownloader.downloadPDF(pdfBlob, `${account.account_name}_statement.pdf`);
+    toast.success('PDF exported successfully');
+  };
+
+  const handleExportExcel = () => {
+    if (!account) return;
+    
+    const ws = XLSX.utils.json_to_sheet(
+      filteredTransactions.map(txn => ({
+        Date: format(new Date(txn.transaction_date), 'dd MMM yyyy'),
+        Type: getTransactionTypeLabel(txn.transaction_type),
+        Description: getTransactionDescription(txn),
+        Amount: txn.amount,
+        'Amount Type': txn.transaction_type === 'partner_withdrawal' || txn.transaction_type === 'expense' || txn.transaction_type === 'refund' ? 'Debit' : 'Credit'
+      }))
+    );
+    
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Transactions');
+    XLSX.writeFile(wb, `${account.account_name}_statement.xlsx`);
+    toast.success('Excel exported successfully');
   };
 
   if (loading) {
@@ -197,10 +411,16 @@ export default function FirmAccountDetails() {
           </Button>
           <h1 className="text-3xl font-bold">Account Statement - {account.account_name}</h1>
         </div>
-        <Button onClick={() => setSendMoneyDialogOpen(true)}>
-          <Send className="h-4 w-4 mr-2" />
-          Send Money
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setCustomTypeDialogOpen(true)}>
+            <Plus className="h-4 w-4 mr-2" />
+            Manage Types
+          </Button>
+          <Button onClick={() => setSendMoneyDialogOpen(true)}>
+            <Send className="h-4 w-4 mr-2" />
+            Send Money
+          </Button>
+        </div>
       </div>
 
       <Card className="mb-6">
@@ -241,30 +461,91 @@ export default function FirmAccountDetails() {
         </CardContent>
       </Card>
 
+      {/* Transaction Summary Cards */}
+      {Object.keys(typeSummary).length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
+          {Object.entries(typeSummary).map(([type, data]) => (
+            <Card key={type}>
+              <CardContent className="pt-6">
+                <div className="text-sm text-muted-foreground mb-1">
+                  {getTransactionTypeLabel(type)}
+                </div>
+                <div className="text-2xl font-bold">₹{data.total.toFixed(2)}</div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  {data.count} transaction{data.count !== 1 ? 's' : ''}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
       <Card>
         <CardHeader>
-          <CardTitle>Transaction History</CardTitle>
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <CardTitle>Transaction History</CardTitle>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={handleExportPDF}>
+                  <Download className="h-4 w-4 mr-2" />
+                  PDF
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleExportExcel}>
+                  <FileSpreadsheet className="h-4 w-4 mr-2" />
+                  Excel
+                </Button>
+              </div>
+            </div>
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search by type, description, amount, or date..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Input
+                  type="date"
+                  placeholder="Start Date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="w-40"
+                />
+                <Input
+                  type="date"
+                  placeholder="End Date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="w-40"
+                />
+              </div>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
-          {transactions.length === 0 ? (
+          {filteredTransactions.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              No transactions found for this account
+              {transactions.length === 0 ? 'No transactions found for this account' : 'No transactions match your search criteria'}
             </div>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Description</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
-                  {(settings.allowEdit || settings.allowDelete) && (
-                    <TableHead className="text-right">Actions</TableHead>
-                  )}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {transactions.map((transaction) => (
+            <>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
+                    {(settings.allowEdit || settings.allowDelete) && (
+                      <TableHead className="text-right">Actions</TableHead>
+                    )}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paginatedTransactions.map((transaction) => (
                   <TableRow key={transaction.id}>
                     <TableCell>
                       {format(new Date(transaction.transaction_date), 'dd MMM yyyy')}
@@ -273,7 +554,7 @@ export default function FirmAccountDetails() {
                       {getTransactionTypeLabel(transaction.transaction_type)}
                     </TableCell>
                     <TableCell className="max-w-md truncate">
-                      {transaction.description || '-'}
+                      {getTransactionDescription(transaction)}
                     </TableCell>
                     <TableCell className={`text-right font-medium ${
                       transaction.transaction_type === 'partner_withdrawal' || 
@@ -314,9 +595,40 @@ export default function FirmAccountDetails() {
                       </TableCell>
                     )}
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                  ))}
+                </TableBody>
+              </Table>
+              
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between mt-4">
+                  <div className="text-sm text-muted-foreground">
+                    Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredTransactions.length)} of {filteredTransactions.length} transactions
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <span className="text-sm">
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
@@ -334,6 +646,11 @@ export default function FirmAccountDetails() {
         firmAccountId={account.id}
         firmAccountName={account.account_name}
         onMoneySent={handleTransactionUpdated}
+      />
+
+      <CustomTransactionTypeManager
+        open={customTypeDialogOpen}
+        onOpenChange={setCustomTypeDialogOpen}
       />
     </div>
   );

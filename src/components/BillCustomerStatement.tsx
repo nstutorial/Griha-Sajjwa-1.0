@@ -244,6 +244,10 @@ export function BillCustomerStatement({ customer }: BillCustomerStatementProps) 
     
     if (!confirm('Are you sure you want to delete this transaction?')) return;
 
+    const trans = transactions.find(t => t.id === entry.transaction_id);
+    if (!trans) return;
+
+    // Delete the sale transaction
     const { error } = await supabase
       .from('sale_transactions')
       .delete()
@@ -255,6 +259,24 @@ export function BillCustomerStatement({ customer }: BillCustomerStatementProps) 
       return;
     }
 
+    // If this was a payment transaction, also delete the corresponding firm transaction
+    if (trans.transaction_type === 'payment') {
+      const { data: firmTransData } = await supabase
+        .from('firm_transactions')
+        .select('*')
+        .eq('transaction_type', 'income')
+        .eq('amount', trans.amount)
+        .eq('transaction_date', trans.payment_date)
+        .ilike('description', `%${customer.name}%`);
+
+      if (firmTransData && firmTransData.length > 0) {
+        await supabase
+          .from('firm_transactions')
+          .delete()
+          .eq('id', firmTransData[0].id);
+      }
+    }
+
     toast.success('Transaction deleted successfully');
     fetchCustomerData();
   };
@@ -262,13 +284,21 @@ export function BillCustomerStatement({ customer }: BillCustomerStatementProps) 
   const handleSaveEdit = async () => {
     if (!editingTransaction) return;
 
+    const oldAmount = editingTransaction.amount;
+    const newAmount = parseFloat(editForm.amount);
+    const oldTransactionType = editingTransaction.transaction_type;
+    const newTransactionType = editForm.transaction_type;
+    const oldDate = editingTransaction.payment_date;
+    const newDate = editForm.payment_date;
+
+    // Update the sale transaction
     const { error } = await supabase
       .from('sale_transactions')
       .update({
-        amount: parseFloat(editForm.amount),
-        payment_date: editForm.payment_date,
+        amount: newAmount,
+        payment_date: newDate,
         payment_mode: editForm.payment_mode,
-        transaction_type: editForm.transaction_type,
+        transaction_type: newTransactionType,
         notes: editForm.notes || null
       })
       .eq('id', editingTransaction.id);
@@ -277,6 +307,40 @@ export function BillCustomerStatement({ customer }: BillCustomerStatementProps) 
       console.error('Error updating transaction:', error);
       toast.error('Failed to update transaction');
       return;
+    }
+
+    // Find and update the corresponding firm transaction
+    // Firm transactions are created when recording payments with type 'payment'
+    if (oldTransactionType === 'payment' || newTransactionType === 'payment') {
+      // Find firm transaction that matches this sale transaction
+      // It would have been created with type 'income' and description containing customer name
+      const { data: firmTransData } = await supabase
+        .from('firm_transactions')
+        .select('*')
+        .eq('transaction_type', 'income')
+        .eq('amount', oldAmount)
+        .eq('transaction_date', oldDate)
+        .ilike('description', `%${customer.name}%`);
+
+      if (firmTransData && firmTransData.length > 0) {
+        // Update the firm transaction to match the new sale transaction
+        if (newTransactionType === 'payment') {
+          await supabase
+            .from('firm_transactions')
+            .update({
+              amount: newAmount,
+              transaction_date: newDate,
+              description: `Payment received from ${customer.name}`,
+            })
+            .eq('id', firmTransData[0].id);
+        } else {
+          // If transaction type changed from payment to refund, delete the firm transaction
+          await supabase
+            .from('firm_transactions')
+            .delete()
+            .eq('id', firmTransData[0].id);
+        }
+      }
     }
 
     toast.success('Transaction updated successfully');

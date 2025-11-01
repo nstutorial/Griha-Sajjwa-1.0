@@ -174,6 +174,27 @@ export type Database = {
           },
         ]
       }
+      custom_transaction_types: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       customers: {
         Row: {
           address: string | null
@@ -342,6 +363,7 @@ export type Database = {
           description: string | null
           firm_account_id: string
           id: string
+          mahajan_id: string | null
           partner_id: string | null
           transaction_date: string
           transaction_type: string
@@ -352,6 +374,7 @@ export type Database = {
           description?: string | null
           firm_account_id: string
           id?: string
+          mahajan_id?: string | null
           partner_id?: string | null
           transaction_date?: string
           transaction_type: string
@@ -362,6 +385,7 @@ export type Database = {
           description?: string | null
           firm_account_id?: string
           id?: string
+          mahajan_id?: string | null
           partner_id?: string | null
           transaction_date?: string
           transaction_type?: string
@@ -372,6 +396,13 @@ export type Database = {
             columns: ["firm_account_id"]
             isOneToOne: false
             referencedRelation: "firm_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "firm_transactions_mahajan_id_fkey"
+            columns: ["mahajan_id"]
+            isOneToOne: false
+            referencedRelation: "mahajans"
             referencedColumns: ["id"]
           },
         ]

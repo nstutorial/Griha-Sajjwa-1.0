@@ -23,6 +23,11 @@ interface EditFirmTransactionDialogProps {
   onTransactionUpdated: () => void;
 }
 
+interface CustomTransactionType {
+  id: string;
+  name: string;
+}
+
 export function EditFirmTransactionDialog({
   open,
   onOpenChange,
@@ -30,6 +35,7 @@ export function EditFirmTransactionDialog({
   onTransactionUpdated
 }: EditFirmTransactionDialogProps) {
   const [loading, setLoading] = useState(false);
+  const [customTypes, setCustomTypes] = useState<CustomTransactionType[]>([]);
   const [formData, setFormData] = useState({
     transaction_type: '',
     amount: '',
@@ -47,6 +53,44 @@ export function EditFirmTransactionDialog({
       });
     }
   }, [transaction, open]);
+
+  useEffect(() => {
+    if (open) {
+      fetchCustomTypes();
+    }
+  }, [open]);
+
+  const fetchCustomTypes = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from('custom_transaction_types')
+        .select('id, name')
+        .eq('user_id', user.id)
+        .order('name');
+
+      if (error) throw error;
+      
+      // Standard transaction type values to avoid duplicates
+      const standardTypes = [
+        'partner_deposit', 'partner_withdrawal', 'refund', 'expense', 
+        'income', 'adjustment', 'gst_tax_payment', 'income_tax_payment', 
+        'paid_to_ca', 'paid_to_supplier'
+      ];
+      
+      // Filter out custom types that would conflict with standard types
+      const filteredTypes = (data || []).filter(type => {
+        const slug = type.name.toLowerCase().replace(/\s+/g, '_');
+        return !standardTypes.includes(slug);
+      });
+      
+      setCustomTypes(filteredTypes);
+    } catch (error: any) {
+      console.error('Error fetching custom types:', error);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -102,6 +146,15 @@ export function EditFirmTransactionDialog({
                 <SelectItem value="expense">Expense</SelectItem>
                 <SelectItem value="income">Income</SelectItem>
                 <SelectItem value="adjustment">Adjustment</SelectItem>
+                <SelectItem value="gst_tax_payment">GST Tax Payment</SelectItem>
+                <SelectItem value="income_tax_payment">Income Tax Payment</SelectItem>
+                <SelectItem value="paid_to_ca">Paid To CA</SelectItem>
+                <SelectItem value="paid_to_supplier">Paid To Supplier</SelectItem>
+                {customTypes.map((type) => (
+                  <SelectItem key={type.id} value={type.name.toLowerCase().replace(/\s+/g, '_')}>
+                    {type.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
