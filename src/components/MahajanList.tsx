@@ -20,6 +20,7 @@ import EditMahajanDialog from './EditMahajanDialog';
 import AddBillDialog from './AddBillDialog';
 import { AdvancePaymentDetailsDialog } from './AdvancePaymentDetailsDialog';
 
+
 interface Mahajan {
   id: string;
   name: string;
@@ -37,9 +38,11 @@ interface Mahajan {
   }>;
 }
 
+
 interface MahajanListProps {
   onUpdate?: () => void;
 }
+
 
 const MahajanList = ({ onUpdate }: MahajanListProps) => {
   const { user } = useAuth();
@@ -59,6 +62,9 @@ const MahajanList = ({ onUpdate }: MahajanListProps) => {
   const [itemsPerPage, setItemsPerPage] = useState(10);
   const [advanceDetailsOpen, setAdvanceDetailsOpen] = useState(false);
   const [selectedMahajanForAdvance, setSelectedMahajanForAdvance] = useState<Mahajan | null>(null);
+
+  // Table view toggle
+  const [showTableView, setShowTableView] = useState(true);
 
   useEffect(() => {
     if (user) {
@@ -283,135 +289,212 @@ const MahajanList = ({ onUpdate }: MahajanListProps) => {
               </Select>
             </div>
           </div>
+          
+          {/* Table view button */}
+          <Button
+            variant="outline"
+            size="sm"
+            className="mb-2"
+            onClick={() => setShowTableView(prev => !prev)}
+          >
+            {showTableView ? 'Back to Card View' : 'View Mahajan List in Table'}
+          </Button>
         </CardContent>
       </Card>
 
-      {/* Mahajan Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {paginatedMahajans.map((mahajan) => {
-          const outstandingBalance = calculateOutstandingBalance(mahajan);
-          const activeBills = mahajan.bills?.filter(bill => bill.is_active).length || 0;
-          
-          return (
-            <Card key={mahajan.id} className="hover:shadow-md transition-shadow">
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 min-w-0">
-                    <CardTitle className="text-lg truncate">{mahajan.name}</CardTitle>
-                    <div className="flex items-center gap-2 mt-1">
-                      {mahajan.phone && (
-                        <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                          <Phone className="h-3 w-3" />
-                          <span className="truncate">{mahajan.phone}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex gap-1 ml-2">
-                  {controlSettings.allowEdit && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleEditMahajan(mahajan)}
-                      className="h-8 w-8 p-0"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                     )}
-                      {controlSettings.allowDelete && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDeleteMahajan(mahajan.id)}
-                      className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                     )}
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="pt-0">
-                <div className="space-y-3">
-                  {mahajan.address && (
-                    <div className="flex items-start gap-2 text-sm text-muted-foreground">
-                      <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                      <span className="line-clamp-2">{mahajan.address}</span>
-                    </div>
-                  )}
-                  
-                  {mahajan.payment_day && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Calendar className="h-4 w-4" />
-                      <span className="capitalize">{mahajan.payment_day}</span>
-                    </div>
-                  )}
-
-                  <div className="space-y-2 pt-2 border-t">
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm">
-                        <div className="text-muted-foreground">Active Bills</div>
-                        <div className="font-medium">{activeBills}</div>
-                      </div>
-                      <div className="text-sm text-right">
-                        <div className="text-muted-foreground">Outstanding</div>
-                        <div className={`font-medium ${outstandingBalance > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                          {formatCurrency(outstandingBalance)}
-                        </div>
-                      </div>
-                    </div>
-
-                    {mahajan.advance_payment && mahajan.advance_payment > 0 && (
-                      <div className="flex items-center justify-between pt-2 border-t border-dashed">
-                        <div className="text-sm">
-                          <div className="text-muted-foreground">Advance Payment</div>
-                          <div className="font-medium text-green-600">
-                            {formatCurrency(mahajan.advance_payment)}
-                          </div>
-                        </div>
+      {/* Table or Cards */}
+      {showTableView ? (
+        <div className="overflow-x-auto">
+          <table className="min-w-full border divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700">Name</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700">Phone</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700">Address</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700">Active Bills</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700">Outstanding</th>
+                <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {paginatedMahajans.map((mahajan) => {
+                const outstandingBalance = calculateOutstandingBalance(mahajan);
+                const activeBills = mahajan.bills?.filter(bill => bill.is_active).length || 0;
+                return (
+                  <tr key={mahajan.id}>
+                    <td className="px-3 py-2">{mahajan.name}</td>
+                    <td className="px-3 py-2">{mahajan.phone || '-'}</td>
+                    <td className="px-3 py-2">{mahajan.address || '-'}</td>
+                    <td className="px-3 py-2">{activeBills}</td>
+                    <td className={`px-3 py-2 ${outstandingBalance > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                      {formatCurrency(outstandingBalance)}
+                    </td>
+                    <td className="px-3 py-2 space-x-2">
+                      <Button variant="outline" size="sm" onClick={() => setSelectedMahajan(mahajan)}>
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      {controlSettings.allowEdit && (
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => {
-                            setSelectedMahajanForAdvance(mahajan);
-                            setAdvanceDetailsOpen(true);
-                          }}
-                          className="h-8 px-2"
+                          onClick={() => handleEditMahajan(mahajan)}
                         >
-                          <Info className="h-4 w-4" />
+                          <Edit className="h-4 w-4" />
                         </Button>
+                      )}
+                      {controlSettings.allowDelete && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteMahajan(mahajan.id)}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {controlSettings.allowBillManagement && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleAddBill(mahajan)}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {paginatedMahajans.map((mahajan) => {
+            const outstandingBalance = calculateOutstandingBalance(mahajan);
+            const activeBills = mahajan.bills?.filter(bill => bill.is_active).length || 0;
+            
+            return (
+              <Card key={mahajan.id} className="hover:shadow-md transition-shadow">
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <CardTitle className="text-lg truncate">{mahajan.name}</CardTitle>
+                      <div className="flex items-center gap-2 mt-1">
+                        {mahajan.phone && (
+                          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                            <Phone className="h-3 w-3" />
+                            <span className="truncate">{mahajan.phone}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex gap-1 ml-2">
+                      {controlSettings.allowEdit && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEditMahajan(mahajan)}
+                          className="h-8 w-8 p-0"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        )}
+                        {controlSettings.allowDelete && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteMahajan(mahajan.id)}
+                          className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                        )}
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0">
+                  <div className="space-y-3">
+                    {mahajan.address && (
+                      <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                        <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                        <span className="line-clamp-2">{mahajan.address}</span>
                       </div>
                     )}
-                  </div>
+                    
+                    {mahajan.payment_day && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Calendar className="h-4 w-4" />
+                        <span className="capitalize">{mahajan.payment_day}</span>
+                      </div>
+                    )}
 
-                  <div className="flex gap-2 pt-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setSelectedMahajan(mahajan)}
-                      className="flex-1"
-                    >
-                      <Eye className="h-4 w-4 mr-1" />
-                      View Details
-                    </Button>
-                    {controlSettings.allowBillManagement && (
+                    <div className="space-y-2 pt-2 border-t">
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm">
+                          <div className="text-muted-foreground">Active Bills</div>
+                          <div className="font-medium">{activeBills}</div>
+                        </div>
+                        <div className="text-sm text-right">
+                          <div className="text-muted-foreground">Outstanding</div>
+                          <div className={`font-medium ${outstandingBalance > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                            {formatCurrency(outstandingBalance)}
+                          </div>
+                        </div>
+                      </div>
+
+                      {mahajan.advance_payment && mahajan.advance_payment > 0 && (
+                        <div className="flex items-center justify-between pt-2 border-t border-dashed">
+                          <div className="text-sm">
+                            <div className="text-muted-foreground">Advance Payment</div>
+                            <div className="font-medium text-green-600">
+                              {formatCurrency(mahajan.advance_payment)}
+                            </div>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedMahajanForAdvance(mahajan);
+                              setAdvanceDetailsOpen(true);
+                            }}
+                            className="h-8 px-2"
+                          >
+                            <Info className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex gap-2 pt-2">
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleAddBill(mahajan)}
+                        onClick={() => setSelectedMahajan(mahajan)}
                         className="flex-1"
                       >
-                        <Plus className="h-4 w-4 mr-1" />
-                        Add Bill
+                        <Eye className="h-4 w-4 mr-1" />
+                        View Details
                       </Button>
-                    )}
+                      {controlSettings.allowBillManagement && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleAddBill(mahajan)}
+                          className="flex-1"
+                        >
+                          <Plus className="h-4 w-4 mr-1" />
+                          Add Bill
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
 
       {/* Pagination */}
       {totalPages > 1 && (
