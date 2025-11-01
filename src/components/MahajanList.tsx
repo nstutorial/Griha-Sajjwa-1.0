@@ -20,7 +20,6 @@ import EditMahajanDialog from './EditMahajanDialog';
 import AddBillDialog from './AddBillDialog';
 import { AdvancePaymentDetailsDialog } from './AdvancePaymentDetailsDialog';
 
-
 interface Mahajan {
   id: string;
   name: string;
@@ -38,11 +37,9 @@ interface Mahajan {
   }>;
 }
 
-
 interface MahajanListProps {
   onUpdate?: () => void;
 }
-
 
 const MahajanList = ({ onUpdate }: MahajanListProps) => {
   const { user } = useAuth();
@@ -63,7 +60,7 @@ const MahajanList = ({ onUpdate }: MahajanListProps) => {
   const [advanceDetailsOpen, setAdvanceDetailsOpen] = useState(false);
   const [selectedMahajanForAdvance, setSelectedMahajanForAdvance] = useState<Mahajan | null>(null);
 
-  // Table view toggle
+  // Table view is default
   const [showTableView, setShowTableView] = useState(true);
 
   useEffect(() => {
@@ -142,29 +139,29 @@ const MahajanList = ({ onUpdate }: MahajanListProps) => {
 
   const calculateInterest = (bill: { interest_rate?: number; interest_type?: string; bill_date?: string }, balance: number) => {
     if (!bill.interest_rate || bill.interest_type === 'none') return 0;
-    
+
     const rate = bill.interest_rate / 100;
     const startDate = new Date(bill.bill_date || new Date());
     const endDate = new Date();
-    
+
     if (bill.interest_type === 'daily') {
       const timeDiff = endDate.getTime() - startDate.getTime();
       const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
       return balance * rate * (daysDiff / 365);
     } else if (bill.interest_type === 'monthly') {
       const months = (endDate.getFullYear() - startDate.getFullYear()) * 12 + 
-                     (endDate.getMonth() - startDate.getMonth());
+                    (endDate.getMonth() - startDate.getMonth());
       const daysInMonth = (endDate.getDate() - startDate.getDate()) / 30;
       const totalMonths = months + daysInMonth;
       return balance * rate * totalMonths;
     }
-    
+
     return 0;
   };
 
   const calculateOutstandingBalance = (mahajan: Mahajan) => {
     if (!mahajan.bills) return 0;
-    
+
     const billsTotal = mahajan.bills.reduce((total, bill) => {
       const balance = calculateBillBalance(bill.id);
       const interest = calculateInterest(bill, balance);
@@ -231,6 +228,12 @@ const MahajanList = ({ onUpdate }: MahajanListProps) => {
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const paginatedMahajans = filteredMahajans.slice(startIndex, endIndex);
+
+  // Totals for the current page in table view
+  const pageActiveBillsTotal = paginatedMahajans.reduce((sum, m) => 
+    sum + (m.bills?.filter(bill => bill.is_active).length || 0), 0);
+  const pageOutstandingTotal = paginatedMahajans.reduce((sum, m) =>
+    sum + calculateOutstandingBalance(m), 0);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
@@ -365,6 +368,13 @@ const MahajanList = ({ onUpdate }: MahajanListProps) => {
                   </tr>
                 );
               })}
+              {/* TOTAL ROW */}
+              <tr className="bg-gray-100 font-semibold">
+                <td colSpan={3} className="px-3 py-2 text-right">Total (this page):</td>
+                <td className="px-3 py-2">{pageActiveBillsTotal}</td>
+                <td className="px-3 py-2">{formatCurrency(pageOutstandingTotal)}</td>
+                <td className="px-3 py-2"></td>
+              </tr>
             </tbody>
           </table>
         </div>
