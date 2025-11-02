@@ -33,6 +33,8 @@ interface Loan {
   id: string;
   loan_number: string;
   principal_amount: number;
+  processing_fee?: number;
+  total_outstanding?: number;
   interest_rate: number;
   interest_type: 'daily' | 'monthly' | 'none';
   emi_amount?: number;
@@ -106,6 +108,8 @@ const LoansList: React.FC<LoansListProps> = ({ onUpdate, status = 'active' }) =>
           id,
           loan_number,
           principal_amount,
+          processing_fee,
+          total_outstanding,
           interest_rate,
           interest_type,
           emi_amount,
@@ -665,11 +669,23 @@ Generated on: ${new Date().toLocaleDateString()}
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 md:grid-cols-7 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Principal</p>
                   <p className="font-semibold">₹{loan.principal_amount.toFixed(2)}</p>
                 </div>
+                {loan.processing_fee && loan.processing_fee > 0 && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Processing Fee</p>
+                    <p className="font-semibold text-blue-600">₹{loan.processing_fee.toFixed(2)}</p>
+                  </div>
+                )}
+                {loan.total_outstanding && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Total Outstanding</p>
+                    <p className="font-semibold text-orange-600">₹{loan.total_outstanding.toFixed(2)}</p>
+                  </div>
+                )}
                 <div>
                   <p className="text-sm text-muted-foreground">Interest</p>
                   <p className="font-semibold text-orange-600">₹{interest.toFixed(2)}</p>
@@ -678,6 +694,9 @@ Generated on: ${new Date().toLocaleDateString()}
                   <p className="text-sm text-muted-foreground">Total Amount</p>
                   <p className="font-semibold text-primary">₹{totalAmount.toFixed(2)}</p>
                 </div>
+              </div>
+              
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">EMI Amount</p>
                   <p className="font-semibold text-purple-600">
