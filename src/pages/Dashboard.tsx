@@ -36,6 +36,7 @@ interface DashboardStats {
   activeLoans: number;
   todaysCollection: number;
   thisMonthDisbursed: number;
+  thisMonthSales: number;
 }
 
 const Dashboard = () => {
@@ -47,6 +48,7 @@ const Dashboard = () => {
     activeLoans: 0,
     todaysCollection: 0,
     thisMonthDisbursed: 0,
+    thisMonthSales: 0,
   });
   const [addLoanDialogOpen, setAddLoanDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('customers');
@@ -151,10 +153,21 @@ const Dashboard = () => {
       
       const thisMonthDisbursed = thisMonthLoans?.reduce((sum, loan) => sum + Number(loan.principal_amount), 0) || 0;
 
+      // Get this month's sales
+      const { data: thisMonthSalesData } = await supabase
+        .from('sales')
+        .select('sale_amount')
+        .eq('user_id', user.id)
+        .gte('created_at', startOfMonth)
+        .lte('created_at', endOfMonth);
+      
+      const thisMonthSales = thisMonthSalesData?.reduce((sum, sale) => sum + Number(sale.sale_amount), 0) || 0;
+
       setStats({
         activeLoans,
         todaysCollection,
         thisMonthDisbursed,
+        thisMonthSales,
       });
     } catch (error) {
       console.error('Error fetching stats:', error);
@@ -232,8 +245,11 @@ const Dashboard = () => {
 
       <div className="w-full px-4 py-6">
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-6">
-          <Card className="p-3 sm:p-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
+          <Card 
+            className="p-3 sm:p-4 cursor-pointer hover:shadow-lg transition-shadow"
+            onClick={() => navigate('/reports/collection')}
+          >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-0">
               <CardTitle className="text-xs sm:text-sm font-medium truncate">Today's Collection</CardTitle>
               <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 text-purple-600 flex-shrink-0" />
@@ -245,7 +261,10 @@ const Dashboard = () => {
             </CardContent>
           </Card>
 
-          <Card className="p-3 sm:p-4">
+          <Card 
+            className="p-3 sm:p-4 cursor-pointer hover:shadow-lg transition-shadow"
+            onClick={() => navigate('/reports/disbursed')}
+          >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-0">
               <CardTitle className="text-xs sm:text-sm font-medium truncate">This Month Disbursed</CardTitle>
               <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-indigo-600 flex-shrink-0" />
@@ -257,7 +276,25 @@ const Dashboard = () => {
             </CardContent>
           </Card>
 
-          <Card className="p-3 sm:p-4">
+          <Card 
+            className="p-3 sm:p-4 cursor-pointer hover:shadow-lg transition-shadow"
+            onClick={() => navigate('/reports/sales')}
+          >
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-0">
+              <CardTitle className="text-xs sm:text-sm font-medium truncate">This Month Sales</CardTitle>
+              <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-green-600 flex-shrink-0" />
+            </CardHeader>
+            <CardContent className="p-0 pt-2">
+              <div className="text-lg sm:text-xl lg:text-2xl font-bold text-green-600 truncate">
+                ₹{stats.thisMonthSales.toFixed(2)}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card 
+            className="p-3 sm:p-4 cursor-pointer hover:shadow-lg transition-shadow"
+            onClick={() => navigate('/reports/active-loans')}
+          >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-0">
               <CardTitle className="text-xs sm:text-sm font-medium truncate">Active Loans</CardTitle>
               <Users className="h-3 w-3 sm:h-4 sm:w-4 text-primary flex-shrink-0" />
