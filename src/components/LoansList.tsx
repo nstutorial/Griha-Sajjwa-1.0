@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Users, DollarSign, Calendar, Plus, Eye, Edit, Trash2, FileText, Download } from 'lucide-react';
+import { Users, DollarSign, Calendar, Plus, Eye, Edit, Trash2, FileText, Download, Lock } from 'lucide-react';
 import jsPDF from 'jspdf';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -43,6 +43,7 @@ interface Loan {
   description?: string;
   is_active: boolean;
   customer_id: string;
+  locked?: boolean;
   customers: {
     name: string;
     phone?: string;
@@ -532,7 +533,52 @@ Generated on: ${new Date().toLocaleDateString()}
     }
   };
 
+  const handleLock = async (loan: Loan) => {
+    if (loan.locked) {
+      toast({
+        variant: "destructive",
+        title: "Already locked",
+        description: "To unlock this loan, go to Settings page.",
+      });
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('loans')
+        .update({ locked: true })
+        .eq('id', loan.id);
+
+      if (error) throw error;
+
+      setLoans(loans.map(l => 
+        l.id === loan.id ? { ...l, locked: true } : l
+      ));
+
+      toast({
+        title: "Loan locked",
+        description: "Loan can no longer be edited or deleted. Go to Settings to unlock.",
+      });
+    } catch (error) {
+      console.error('Error locking loan:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to lock loan",
+      });
+    }
+  };
+
   const handleQuickDelete = async (loan: Loan) => {
+    if (loan.locked) {
+      toast({
+        variant: "destructive",
+        title: "Cannot delete loan",
+        description: "This loan is locked. Unlock it first to delete.",
+      });
+      return;
+    }
+
     if (!confirm(`Are you sure you want to delete loan #${loan.loan_number} for ${loan.customers.name}? This action cannot be undone.`)) return;
 
     try {
@@ -746,13 +792,31 @@ Generated on: ${new Date().toLocaleDateString()}
                     </Button>
                   </div>
                 )}
+                <Button
+                  variant={loan.locked ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => handleLock(loan)}
+                  title={loan.locked ? "Locked - Unlock from Settings" : "Lock loan"}
+                >
+                  <Lock className="h-4 w-4" />
+                </Button>
                 {controlSettings.allowEdit && !isClosed && (
-                  <Button variant="outline" size="sm" onClick={() => handleEditLoan(loan)}>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => handleEditLoan(loan)}
+                    disabled={loan.locked}
+                  >
                     <Edit className="h-4 w-4" />
                   </Button>
                 )}
                 {controlSettings.allowDelete && !isClosed && (
-                  <Button variant="destructive" size="sm" onClick={() => handleQuickDelete(loan)}>
+                  <Button 
+                    variant="destructive" 
+                    size="sm" 
+                    onClick={() => handleQuickDelete(loan)}
+                    disabled={loan.locked}
+                  >
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 )}
