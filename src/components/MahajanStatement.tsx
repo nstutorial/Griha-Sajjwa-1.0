@@ -67,6 +67,14 @@ interface PartnerTransaction {
   } | null;
 }
 
+interface AdvancePaymentTransaction {
+  id: string;
+  amount: number;
+  payment_date: string;
+  payment_mode: string;
+  notes: string | null;
+}
+
 interface StatementEntry {
   date: string;
   description: string;
@@ -74,7 +82,7 @@ interface StatementEntry {
   debit: number;
   credit: number;
   balance: number;
-  type: 'bill_disbursement' | 'payment_paid' | 'interest_accrued' | 'firm_payment' | 'partner_payment';
+  type: 'bill_disbursement' | 'payment_paid' | 'interest_accrued' | 'firm_payment' | 'partner_payment' | 'advance_payment';
 }
 
 interface MahajanStatementProps {
@@ -88,6 +96,7 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
   const [transactions, setTransactions] = useState<BillTransaction[]>([]);
   const [firmTransactions, setFirmTransactions] = useState<FirmTransaction[]>([]);
   const [partnerTransactions, setPartnerTransactions] = useState<PartnerTransaction[]>([]);
+  const [advancePaymentTransactions, setAdvancePaymentTransactions] = useState<AdvancePaymentTransaction[]>([]);
   const [statement, setStatement] = useState<StatementEntry[]>([]);
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
@@ -100,10 +109,10 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
   }, [user, mahajan.id]);
 
   useEffect(() => {
-    if (bills.length > 0 || firmTransactions.length > 0 || partnerTransactions.length > 0) {
+    if (bills.length > 0 || firmTransactions.length > 0 || partnerTransactions.length > 0 || advancePaymentTransactions.length > 0) {
       generateStatement();
     }
-  }, [bills, transactions, firmTransactions, partnerTransactions, startDate, endDate]);
+  }, [bills, transactions, firmTransactions, partnerTransactions, advancePaymentTransactions, startDate, endDate]);
 
   // Realtime subscriptions for partner transaction updates
   useEffect(() => {
@@ -181,6 +190,23 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
 
       if (partnerTransError) throw partnerTransError;
 
+      // Fetch advance payment transactions for this mahajan
+      let advancePaymentTransData: AdvancePaymentTransaction[] = [];
+      try {
+        const { data, error: advancePaymentTransError } = await supabase
+          .from('advance_payment_transactions' as any)
+          .select('*')
+          .eq('mahajan_id', mahajan.id)
+          .order('payment_date', { ascending: true });
+
+        if (!advancePaymentTransError && data) {
+          advancePaymentTransData = data as unknown as AdvancePaymentTransaction[];
+        }
+      } catch (err) {
+        // Table might not exist yet
+        console.log('Advance payment transactions table not available yet');
+      }
+
       let transactionsData: BillTransaction[] = [];
 
       // Fetch transactions (only if there are bills)
@@ -203,6 +229,7 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
       setBills(billsData || []);
       setFirmTransactions(firmTransData || []);
       setPartnerTransactions(partnerTransData || []);
+      setAdvancePaymentTransactions(advancePaymentTransData);
 
     } catch (error) {
       console.error('Error fetching mahajan data:', error);
@@ -273,7 +300,7 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
         }
       }
       
-      // Build description with all bill details
+      // Build description with all bill details and notes
       let description = `Payment Received`;
       
       // Extract partner info if present
@@ -287,10 +314,24 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
       
       description += partnerInfo;
       
-      // Add bill details
-      const billDetails = groupedTransactions.map(t => 
-        `₹${t.amount.toFixed(2)} for payment of ${t.bill.bill_number}`
-      ).join('\n');
+      // Add bill details with all notes from bill_transactions including REF#
+      const billDetails = groupedTransactions.map(t => {
+        let detail = `₹${t.amount.toFixed(2)} for ${t.bill.bill_number}`;
+        
+        // Extract and clean notes - remove only "Payment from partner:" but keep REF# and user notes
+        if (t.notes) {
+          let cleanNotes = t.notes;
+          // Remove "Payment from partner:" pattern
+          cleanNotes = cleanNotes.replace(/Payment from partner:[^-]+-?/g, '').trim();
+          // Remove leading/trailing dashes and spaces
+          cleanNotes = cleanNotes.replace(/^[-\s]+|[-\s]+$/g, '').trim();
+          
+          if (cleanNotes) {
+            detail += ` - ${cleanNotes}`;
+          }
+        }
+        return detail;
+      }).join('\n');
       
       description += '\n' + billDetails;
 
@@ -344,6 +385,25 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
       }
     });
 
+    // Add advance payment transactions
+    advancePaymentTransactions.forEach(advanceTrans => {
+      const transDate = new Date(advanceTrans.payment_date);
+      const isInRange = (!startDate || transDate >= new Date(startDate)) && 
+                       (!endDate || transDate <= new Date(endDate));
+
+      if (isInRange) {
+        allEntries.push({
+          date: advanceTrans.payment_date,
+          description: `Advance Payment${advanceTrans.notes ? ' - ' + advanceTrans.notes : ''}`,
+          reference: 'ADVANCE',
+          debit: 0,
+          credit: advanceTrans.amount,
+          balance: 0, // Will be calculated after sorting
+          type: 'advance_payment'
+        });
+      }
+    });
+
     // Sort by date in ascending order
     allEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
@@ -352,7 +412,7 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
       if (entry.type === 'bill_disbursement') {
         entry.balance = runningBalance + entry.debit;
         runningBalance += entry.debit;
-      } else if (entry.type === 'payment_paid' || entry.type === 'firm_payment' || entry.type === 'partner_payment') {
+      } else if (entry.type === 'payment_paid' || entry.type === 'firm_payment' || entry.type === 'partner_payment' || entry.type === 'advance_payment') {
         entry.balance = runningBalance - entry.credit;
         runningBalance -= entry.credit;
       }
@@ -412,194 +472,201 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
     }).format(amount);
   };
 
-  const exportToPDF = async () => {
-    try {
-      const doc = new jsPDF("p", "mm", "a4"); // Portrait, mm, A4
-      const pageWidth = doc.internal.pageSize.width;
-      const pageHeight = doc.internal.pageSize.height;
-      const margin = 20;
-      const tableWidth = pageWidth - margin * 2;
-  
-      // ---------------- HEADER ----------------
-      doc.setFontSize(16).setFont("helvetica", "bold");
-      doc.text("Mahajan Statement", pageWidth / 2, 20, { align: "center" });
-  
-      doc.setFontSize(14);
-      doc.text(mahajan.name, pageWidth / 2, 30, { align: "center" });
-  
-      doc.setLineWidth(0.5);
-      doc.line(30, 35, pageWidth - 30, 35);
-  
-      let y = 45;
-  
-      // ---------------- MAHAJAN INFO ----------------
-      doc.setFontSize(10).setFont("helvetica", "normal");
-      doc.text(`Mahajan: ${mahajan.name}`, margin, y); y += 6;
-      doc.text(`Phone: ${mahajan.phone || "N/A"}`, margin, y); y += 6;
-      doc.text(`Address: ${mahajan.address || "N/A"}`, margin, y); y += 6;
-      doc.text(
-        `Statement Period: ${startDate ? format(new Date(startDate), "dd/MM/yyyy") : "All"} - ${endDate ? format(new Date(endDate), "dd/MM/yyyy") : "Current"}`,
-        margin,
-        y
-      );
-      y += 15;
-  
-      // ---------------- TABLE HEADERS ----------------
-      doc.setFontSize(9).setFont("helvetica", "bold");
-  
-      const colWidths = [
-        tableWidth * 0.15, // Date
-        tableWidth * 0.25, // Description
-        tableWidth * 0.10, // Ref
-        tableWidth * 0.15, // Debit
-        tableWidth * 0.15, // Credit
-        tableWidth * 0.20, // Balance
-      ];
-  
-      const drawTableHeader = (yPos: number) => {
-        let colX = margin;
-        const headers = ["Date", "Description", "Ref", "Debit", "Credit", "Balance"];
-        headers.forEach((header, i) => {
-          const align = i === 1 ? "left" : "center";
-          const offset = i === 1 ? 2 : colWidths[i] / 2;
-          doc.text(header, colX + offset, yPos, { align });
-          colX += colWidths[i];
-        });
-  
-        doc.setLineWidth(0.5);
-        doc.rect(margin, yPos - 5, tableWidth, 8);
-  
-        colX = margin;
-        for (let i = 0; i < colWidths.length - 1; i++) {
-          colX += colWidths[i];
-          doc.line(colX, yPos - 5, colX, yPos + 3);
-        }
-      };
-  
-      drawTableHeader(y);
-      y += 2;
-  
-      // ---------------- TABLE ROWS ----------------
-      doc.setFont("helvetica", "normal");
-  
-      statement.forEach((entry) => {
-        const descLines = doc.splitTextToSize(entry.description, colWidths[1] - 4);
-        const rowHeight = Math.max(8, descLines.length * 5 + 4);
-  
-        if (y + rowHeight > pageHeight - 30) {
-          doc.addPage();
-          y = 20;
-          drawTableHeader(y);
-          y += 8;
-        }
-  
-        let colX = margin;
-        const date = format(new Date(entry.date), "dd/MM/yyyy");
-        const reference = entry.reference.length > 8 ? entry.reference.slice(0, 6) + "..." : entry.reference;
-        const debitText = entry.debit > 0 ? formatCurrency(entry.debit).replace("₹", "") : "-";
-        const creditText = entry.credit > 0 ? formatCurrency(entry.credit).replace("₹", "") : "-";
-        const balanceText = formatCurrency(entry.balance).replace("₹", "");
-  
-        // Date
-        doc.text(date, colX + colWidths[0] / 2, y + 4, { align: "center" });
-        colX += colWidths[0];
-  
-        // Description
-        descLines.forEach((line, i) => {
-          doc.text(line, colX + 2, y + 4 + i * 5);
-        });
-        colX += colWidths[1];
-  
-        // Ref
-        doc.text(reference, colX + colWidths[2] / 2, y + 4, { align: "center" });
-        colX += colWidths[2];
-  
-        // Debit (red)
-        doc.setTextColor(255, 0, 0);
-        doc.text(debitText, colX + colWidths[3] / 2, y + 4, { align: "center" });
-        colX += colWidths[3];
-  
-        // Credit (green)
-        doc.setTextColor(0, 128, 0);
-        doc.text(creditText, colX + colWidths[4] / 2, y + 4, { align: "center" });
-        colX += colWidths[4];
-  
-        // Balance (black bold)
-        doc.setTextColor(0, 0, 0);
-        doc.setFont("helvetica", "bold");
-        doc.text(balanceText, colX + colWidths[5] / 2, y + 4, { align: "center" });
-  
-        // Reset font
-        doc.setFont("helvetica", "normal");
-  
-        // Draw row borders
-        colX = margin;
-        for (let i = 0; i < colWidths.length; i++) {
-          doc.rect(colX, y, colWidths[i], rowHeight);
-          colX += colWidths[i];
-        }
-  
-        y += rowHeight;
+  const exportToPDF = async () => { 
+  try {
+    const doc = new jsPDF("p", "mm", "a4"); // Portrait, mm, A4
+    const pageWidth = doc.internal.pageSize.width;
+    const pageHeight = doc.internal.pageSize.height;
+    const margin = 20;
+    const tableWidth = pageWidth - margin * 2;
+
+    // ---------------- HEADER ----------------
+    doc.setFontSize(16).setFont("helvetica", "bold");
+    doc.text("Mahajan Statement", pageWidth / 2, 20, { align: "center" });
+
+    doc.setFontSize(14);
+    doc.text(mahajan.name, pageWidth / 2, 30, { align: "center" });
+
+    doc.setLineWidth(0.5);
+    doc.line(30, 35, pageWidth - 30, 35);
+
+    let y = 45;
+
+    // ---------------- MAHAJAN INFO ----------------
+    doc.setFontSize(10).setFont("helvetica", "normal");
+    doc.text(`Mahajan: ${mahajan.name}`, margin, y); y += 6;
+    doc.text(`Phone: ${mahajan.phone || "N/A"}`, margin, y); y += 6;
+    doc.text(`Address: ${mahajan.address || "N/A"}`, margin, y); y += 6;
+    doc.text(
+      `Statement Period: ${startDate ? format(new Date(startDate), "dd/MM/yyyy") : "All"} - ${endDate ? format(new Date(endDate), "dd/MM/yyyy") : "Current"}`,
+      margin,
+      y
+    );
+    y += 15;
+
+    // ---------------- TABLE HEADERS ----------------
+    doc.setFontSize(9).setFont("helvetica", "bold");
+
+    const colWidths = [
+      tableWidth * 0.15, // Date
+      tableWidth * 0.25, // Description
+      tableWidth * 0.10, // Ref
+      tableWidth * 0.15, // Debit
+      tableWidth * 0.15, // Credit
+      tableWidth * 0.20, // Balance
+    ];
+
+    const drawTableHeader = (yPos) => {
+      let colX = margin;
+      const headers = ["Date", "Description", "Ref", "Debit", "Credit", "Balance"];
+      headers.forEach((header, i) => {
+        const align = i === 1 ? "left" : "center";
+        const offset = i === 1 ? 2 : colWidths[i] / 2;
+        doc.text(header, colX + offset, yPos, { align });
+        colX += colWidths[i];
       });
-  
-      // ---------------- SUMMARY ----------------
-      if (y + 30 > pageHeight - 20) {
+
+      doc.setLineWidth(0.5);
+      doc.rect(margin, yPos - 5, tableWidth, 8);
+
+      colX = margin;
+      for (let i = 0; i < colWidths.length - 1; i++) {
+        colX += colWidths[i];
+        doc.line(colX, yPos - 5, colX, yPos + 3);
+      }
+    };
+
+    drawTableHeader(y);
+    y += 2;
+
+    // ---------------- TABLE ROWS ----------------
+    doc.setFont("helvetica", "normal");
+
+    // Utility: Clean numbers and text
+    const cleanNumber = (num) => String(num).replace(/[^\d.-]/g, "");
+    const cleanText = (text) => String(text || "").replace(/[^\w\s.,()\-/:]/g, "");
+
+    statement.forEach((entry) => {
+      const descText = cleanText(entry.description);
+      const descLines = doc.splitTextToSize(descText, colWidths[1] - 4);
+      const rowHeight = Math.max(8, descLines.length * 5 + 4);
+
+      if (y + rowHeight > pageHeight - 30) {
         doc.addPage();
         y = 20;
+        drawTableHeader(y);
+        y += 8;
       }
 
-      // Add top margin/padding before Account Summary
-      y += 20;
+      let colX = margin;
+      const date = format(new Date(entry.date), "dd/MM/yyyy");
+      const reference = cleanText(entry.reference.length > 8 ? entry.reference.slice(0, 6) + "..." : entry.reference);
+      const debitText = entry.debit > 0 ? cleanNumber(entry.debit) : "-";
+      const creditText = entry.credit > 0 ? cleanNumber(entry.credit) : "-";
+      const balanceText = cleanNumber(entry.balance);
 
-      doc.setFontSize(12).setFont("helvetica", "bold");
-      doc.text("Account Summary", margin, y); 
-      y += 15;
-  
-      const totalDebits = statement.reduce((sum, entry) => sum + entry.debit, 0);
-      const totalCredits = statement.reduce((sum, entry) => sum + entry.credit, 0);
-      const outstandingBalance = totalDebits - totalCredits;
-  
-      doc.setFillColor(249, 249, 249);
-      doc.rect(margin, y - 5, tableWidth, 30, "F");
-  
-      doc.setFontSize(10).setFont("helvetica", "normal");
-      doc.text(`Total Debits: ${formatCurrency(totalDebits).replace("₹", "")}`, margin + 5, y);
-      y += 6;
-      doc.text(`Total Credits: ${formatCurrency(totalCredits).replace("₹", "")}`, margin + 5, y);
-      y += 6;
+      // Date
+      doc.text(date, colX + colWidths[0] / 2, y + 4, { align: "center" });
+      colX += colWidths[0];
+
+      // Description
+      descLines.forEach((line, i) => {
+        doc.text(line, colX + 2, y + 4 + i * 5);
+      });
+      colX += colWidths[1];
+
+      // Ref
+      doc.text(reference, colX + colWidths[2] / 2, y + 4, { align: "center" });
+      colX += colWidths[2];
+
+      // Debit (red)
+      doc.setTextColor(255, 0, 0);
+      doc.text(debitText, colX + colWidths[3] / 2, y + 4, { align: "center" });
+      colX += colWidths[3];
+
+      // Credit (green)
+      doc.setTextColor(0, 128, 0);
+      doc.text(creditText, colX + colWidths[4] / 2, y + 4, { align: "center" });
+      colX += colWidths[4];
+
+      // Balance (black bold)
+      doc.setTextColor(0, 0, 0);
       doc.setFont("helvetica", "bold");
-      doc.text(`Outstanding Balance: ${formatCurrency(outstandingBalance).replace("₹", "")}`, margin + 5, y);
-      y += 6;
+      doc.text(balanceText, colX + colWidths[5] / 2, y + 4, { align: "center" });
+
+      // Reset font
       doc.setFont("helvetica", "normal");
-      doc.text(`Total Transactions: ${statement.length}`, margin + 5, y);
-  
-      // ---------------- FOOTER ---------------- 
-      const pageCount = doc.getNumberOfPages();
-      for (let i = 1; i <= pageCount; i++) {
-        doc.setPage(i);
-        doc.setFontSize(8);
-        doc.text(`Page ${i} of ${pageCount}`, pageWidth - margin, pageHeight - 10, { align: "right" });
+
+      // Draw row borders
+      colX = margin;
+      for (let i = 0; i < colWidths.length; i++) {
+        doc.rect(colX, y, colWidths[i], rowHeight);
+        colX += colWidths[i];
       }
-  
-      // ---------------- SAVE ----------------
-      const pdfName = `mahajan-statement-${mahajan.name.replace(/\s+/g, "-").toLowerCase()}-${format(new Date(), "yyyy-MM-dd")}.pdf`;
-      const pdfBlob = doc.output("blob");
-      saveAs(pdfBlob, pdfName);
-  
-      toast({
-        title: "PDF Downloaded",
-        description: "Mahajan statement has been downloaded as PDF.",
-      });
-  
-    } catch (error) {
-      console.error("Error generating PDF:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to generate PDF statement",
-      });
+
+      y += rowHeight;
+    });
+
+    // ---------------- SUMMARY ----------------
+    if (y + 30 > pageHeight - 20) {
+      doc.addPage();
+      y = 20;
     }
-  };
+
+    // Add top margin/padding before Account Summary
+    y += 20;
+
+    doc.setFontSize(12).setFont("helvetica", "bold");
+    doc.text("Account Summary", margin, y); 
+    y += 15;
+
+    const totalDebits = statement.reduce((sum, entry) => sum + entry.debit, 0);
+    const totalCredits = statement.reduce((sum, entry) => sum + entry.credit, 0);
+    const outstandingBalance = totalDebits - totalCredits;
+
+    doc.setFillColor(249, 249, 249);
+    doc.rect(margin, y - 5, tableWidth, 30, "F");
+
+    doc.setFontSize(10).setFont("helvetica", "normal");
+    doc.text(`Total Debits: ${cleanNumber(totalDebits)}`, margin + 5, y);
+    y += 6;
+    doc.text(`Total Credits: ${cleanNumber(totalCredits)}`, margin + 5, y);
+    y += 6;
+    doc.setFont("helvetica", "bold");
+    doc.text(`Outstanding Balance: ${cleanNumber(outstandingBalance)}`, margin + 5, y);
+    y += 6;
+    doc.setFont("helvetica", "normal");
+    doc.text(`Total Transactions: ${statement.length}`, margin + 5, y);
+
+    // ---------------- FOOTER ---------------- 
+    const pageCount = doc.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.text(`Page ${i} of ${pageCount}`, pageWidth - margin, pageHeight - 10, { align: "right" });
+    }
+
+    // ---------------- SAVE ----------------
+    const pdfName = `mahajan-statement-${mahajan.name.replace(/\s+/g, "-").toLowerCase()}-${format(new Date(), "yyyy-MM-dd")}.pdf`;
+    const pdfBlob = doc.output("blob");
+    saveAs(pdfBlob, pdfName);
+
+    toast({
+      title: "PDF Downloaded",
+      description: "Mahajan statement has been downloaded as PDF.",
+    });
+
+  } catch (error) {
+    console.error("Error generating PDF:", error);
+    toast({
+      variant: "destructive",
+      title: "Error",
+      description: "Failed to generate PDF statement",
+    });
+  }
+};
+
+
 
   return (
     <div className="space-y-6">
@@ -702,7 +769,7 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
                       <td className="p-3 text-sm">{format(new Date(entry.date), 'dd/MM/yyyy')}</td>
                       <td className="p-3">
                         <div className="flex items-center gap-2">
-                          <span className="whitespace-pre-line">{entry.description}</span>
+                          <span className="whitespace-pre-line">{entry.description}</span>                          
                           <Badge 
                              variant={
                               entry.type === 'bill_disbursement' ? 'destructive' :
@@ -717,8 +784,8 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
                           </Badge>
                         </div>
                       </td>
-                      <td className="p-3 text-sm text-gray-600">{entry.reference}</td>
-                      <td className="p-3 text-right">
+                      <td className="p-3 text-sm text-gray-600">{entry.reference}</td> 
+                       <td className="p-3 text-right">
                         {entry.debit > 0 ? (
                           <span className="text-red-600 font-medium">{formatCurrency(entry.debit)}</span>
                         ) : (

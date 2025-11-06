@@ -64,6 +64,16 @@ interface BillTransaction {
   };
 }
 
+interface AdvancePaymentTransaction {
+  id: string;
+  mahajan_id: string;
+  amount: number;
+  payment_date: string;
+  payment_mode: string;
+  notes: string | null;
+  type: 'advance'; // To distinguish from bill transactions
+}
+
 interface MahajanDetailsProps {
   mahajan: Mahajan;
   onBack: () => void;
@@ -76,6 +86,7 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
   const { toast } = useToast();
   const [bills, setBills] = useState<Bill[]>([]);
   const [transactions, setTransactions] = useState<BillTransaction[]>([]);
+  const [advanceTransactions, setAdvanceTransactions] = useState<AdvancePaymentTransaction[]>([]);
   const [firmTransactions, setFirmTransactions] = useState<any[]>([]);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [selectedBillId, setSelectedBillId] = useState('');
@@ -182,8 +193,18 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
 
       if (firmTransError) throw firmTransError;
 
+      // Fetch advance payment transactions
+      const { data: advanceTransData, error: advanceTransError } = await supabase
+        .from('advance_payment_transactions' as any)
+        .select('*')
+        .eq('mahajan_id', mahajan.id)
+        .order('payment_date', { ascending: false });
+
+      if (advanceTransError) console.error('Advance transactions error:', advanceTransError);
+
       // Set all states together to prevent flickering
       setTransactions(transData);
+      setAdvanceTransactions((advanceTransData || []) as unknown as AdvancePaymentTransaction[]);
       setFirmTransactions(firmTransData || []);
       setBills(billsData || []);
     } catch (error: any) {
@@ -266,67 +287,64 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
         .filter(b => b.is_active)
         .sort((a, b) => new Date(a.bill_date).getTime() - new Date(b.bill_date).getTime());
 
-      if (activeBills.length === 0) {
-        toast({
-          variant: 'destructive',
-          title: 'No Active Bills',
-          description: 'There are no active bills to pay',
-        });
-        return;
-      }
-
       let remainingPayment = paymentAmount;
       const transactionsToInsert: any[] = [];
 
-      // Process each bill sequentially
-      for (const bill of activeBills) {
-        if (remainingPayment <= 0) break;
+      // Process each bill sequentially (only if there are active bills)
+      if (activeBills.length > 0) {
+        for (const bill of activeBills) {
+          if (remainingPayment <= 0) break;
 
-        const balance = calculateBillBalance(bill.id);
-        const interest = calculateInterest(bill, balance);
-        const totalBillOutstanding = balance + interest;
+          const balance = calculateBillBalance(bill.id);
+          const interest = calculateInterest(bill, balance);
+          const totalBillOutstanding = balance + interest;
 
-        if (totalBillOutstanding <= 0) continue;
+          if (totalBillOutstanding <= 0) continue;
 
-        // Pay interest first
-        if (interest > 0 && remainingPayment > 0) {
-          const interestPayment = Math.min(interest, remainingPayment);
-          transactionsToInsert.push({
-            bill_id: bill.id,
-            amount: interestPayment,
-            transaction_type: 'interest',
-            payment_mode: paymentData.payment_mode,
-            payment_date: paymentData.payment_date,
-            notes: `REF#${referenceNumber}${paymentData.notes ? ' - ' + paymentData.notes : ''}`,
-          });
-          remainingPayment -= interestPayment;
+          // Pay interest first
+          if (interest > 0 && remainingPayment > 0) {
+            const interestPayment = Math.min(interest, remainingPayment);
+            transactionsToInsert.push({
+              bill_id: bill.id,
+              amount: interestPayment,
+              transaction_type: 'interest',
+              payment_mode: paymentData.payment_mode,
+              payment_date: paymentData.payment_date,
+              notes: `REF#${referenceNumber}${paymentData.notes ? ' - ' + paymentData.notes : ''}`,
+            });
+            remainingPayment -= interestPayment;
+          }
+
+          // Then pay principal
+          if (balance > 0 && remainingPayment > 0) {
+            const principalPayment = Math.min(balance, remainingPayment);
+            transactionsToInsert.push({
+              bill_id: bill.id,
+              amount: principalPayment,
+              transaction_type: 'principal',
+              payment_mode: paymentData.payment_mode,
+              payment_date: paymentData.payment_date,
+              notes: `REF#${referenceNumber}${paymentData.notes ? ' - ' + paymentData.notes : ''}`,
+            });
+            remainingPayment -= principalPayment;
+          }
         }
 
-        // Then pay principal
-        if (balance > 0 && remainingPayment > 0) {
-          const principalPayment = Math.min(balance, remainingPayment);
-          transactionsToInsert.push({
-            bill_id: bill.id,
-            amount: principalPayment,
-            transaction_type: 'principal',
-            payment_mode: paymentData.payment_mode,
-            payment_date: paymentData.payment_date,
-            notes: `REF#${referenceNumber}${paymentData.notes ? ' - ' + paymentData.notes : ''}`,
-          });
-          remainingPayment -= principalPayment;
+        // Insert bill transactions if any
+        if (transactionsToInsert.length > 0) {
+          const { error } = await supabase
+            .from('bill_transactions')
+            .insert(transactionsToInsert);
+
+          if (error) throw error;
         }
       }
 
-      // Insert all transactions
-      const { error } = await supabase
-        .from('bill_transactions')
-        .insert(transactionsToInsert);
-
-      if (error) throw error;
-
-      // If there's remaining payment (overpayment), store it as advance
+      // If there's remaining payment or no active bills, store as advance
       if (remainingPayment > 0) {
         const currentAdvance = mahajanData.advance_payment || 0;
+        
+        // Update mahajan's advance payment balance
         const { error: advanceError } = await supabase
           .from('mahajans')
           .update({ advance_payment: currentAdvance + remainingPayment })
@@ -334,10 +352,35 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
 
         if (advanceError) throw advanceError;
 
-        toast({
-          title: 'Payment recorded',
-          description: `Payment of ${formatCurrency(paymentAmount)} recorded. ${formatCurrency(remainingPayment)} added as advance payment.`,
-        });
+        // Insert advance payment transaction record
+        try {
+          await supabase
+            .from('advance_payment_transactions' as any)
+            .insert({
+              user_id: user.id,
+              mahajan_id: mahajan.id,
+              amount: remainingPayment,
+              payment_date: paymentData.payment_date,
+              payment_mode: paymentData.payment_mode,
+              notes: activeBills.length === 0 
+                ? `Direct advance payment${paymentData.notes ? ' - ' + paymentData.notes : ''}`
+                : `Overpayment from bill payments${paymentData.notes ? ' - ' + paymentData.notes : ''}`,
+            });
+        } catch (err) {
+          console.log('Advance payment transaction table not available yet');
+        }
+
+        if (activeBills.length === 0) {
+          toast({
+            title: 'Payment recorded',
+            description: `${formatCurrency(paymentAmount)} added as advance payment (no active bills)`,
+          });
+        } else {
+          toast({
+            title: 'Payment recorded',
+            description: `Payment of ${formatCurrency(paymentAmount)} recorded. ${formatCurrency(remainingPayment)} added as advance payment.`,
+          });
+        }
       } else {
         toast({
           title: 'Payment recorded',
@@ -667,7 +710,11 @@ const MahajanDetails: React.FC<MahajanDetailsProps> = ({ mahajan, onBack, onUpda
         </TabsContent>
 
         <TabsContent value="searchTransaction">
-          <SearchTransactionById transactions={transactions as any} />
+          <SearchTransactionById 
+            transactions={transactions as any} 
+            advanceTransactions={advanceTransactions as any}
+            onUpdate={fetchBillsAndTransactions}
+          />
         </TabsContent>
       </Tabs>
 
