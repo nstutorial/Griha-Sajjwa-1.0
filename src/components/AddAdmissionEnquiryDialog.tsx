@@ -163,7 +163,7 @@ export function AddAdmissionEnquiryDialog({ onSuccess }: { onSuccess: () => void
                 onChange={(e) => setFormData({ ...formData, religion: e.target.value })}
               />
             </div>
-            <div className="space-y-2 hide">
+           <div style={{ display: 'none' }}>
               <Label htmlFor="nationality">Nationality</Label>
               <Input
                 id="nationality"
@@ -171,6 +171,7 @@ export function AddAdmissionEnquiryDialog({ onSuccess }: { onSuccess: () => void
                 onChange={(e) => setFormData({ ...formData, nationality: e.target.value })}
               />
             </div>
+
             <div className="space-y-2">
               <Label htmlFor="referred_by">Referred By</Label>
               <Input
@@ -180,7 +181,7 @@ export function AddAdmissionEnquiryDialog({ onSuccess }: { onSuccess: () => void
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="course_name">Course Name</Label>
+              <Label htmlFor="course_name">Class Name</Label>
               <Input
                 id="course_name"
                 value={formData.course_name}
