@@ -25,7 +25,7 @@ export function AddAdmissionEnquiryDialog({ onSuccess }: { onSuccess: () => void
     mobile_no: "",
     referred_by: "",
     religion: "",
-    nationality: "",
+    nationality: "INDIAN",
     course_name: "",
     status: "pending",
     enquiry_date: new Date().toISOString().split('T')[0]
@@ -60,7 +60,7 @@ export function AddAdmissionEnquiryDialog({ onSuccess }: { onSuccess: () => void
         mobile_no: "",
         referred_by: "",
         religion: "",
-        nationality: "",
+        nationality: "INDIAN",
         course_name: "",
         status: "pending",
         enquiry_date: new Date().toISOString().split('T')[0]
