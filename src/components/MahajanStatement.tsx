@@ -149,9 +149,43 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
       )
       .subscribe();
 
+    const advancePaymentTransactionsChannel = supabase
+      .channel('mahajan-advance-payment-transactions-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'advance_payment_transactions',
+          filter: `mahajan_id=eq.${mahajan.id}`
+        },
+        () => {
+          fetchMahajanData();
+        }
+      )
+      .subscribe();
+
+    const firmTransactionsChannel = supabase
+      .channel('mahajan-statement-firm-transactions-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'firm_transactions',
+          filter: `mahajan_id=eq.${mahajan.id}`
+        },
+        () => {
+          fetchMahajanData();
+        }
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(partnerTransactionsChannel);
       supabase.removeChannel(billTransactionsChannel);
+      supabase.removeChannel(advancePaymentTransactionsChannel);
+      supabase.removeChannel(firmTransactionsChannel);
     };
   }, [mahajan.id]);
 

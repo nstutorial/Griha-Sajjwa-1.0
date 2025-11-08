@@ -26,6 +26,7 @@ import CollectionReport from "./pages/reports/CollectionReport";
 import DisbursedReport from "./pages/reports/DisbursedReport";
 import SalesReport from "./pages/reports/SalesReport";
 import ActiveLoansReport from "./pages/reports/ActiveLoansReport";
+import AdmissionEnquiry from "./pages/AdmissionEnquiry";
 import NotFound from "./pages/NotFound";
 
 
@@ -179,6 +180,11 @@ const AppRoutes = () => {
       <Route path="/reports/active-loans" element={
         <ProtectedRoute>
           <ActiveLoansReport />
+        </ProtectedRoute>
+      } />
+      <Route path="/admission-enquiry" element={
+        <ProtectedRoute>
+          <AdmissionEnquiry />
         </ProtectedRoute>
       } />
       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
