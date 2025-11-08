@@ -163,7 +163,7 @@ export function AddAdmissionEnquiryDialog({ onSuccess }: { onSuccess: () => void
                 onChange={(e) => setFormData({ ...formData, religion: e.target.value })}
               />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 hide">
               <Label htmlFor="nationality">Nationality</Label>
               <Input
                 id="nationality"
