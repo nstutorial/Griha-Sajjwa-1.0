@@ -310,9 +310,9 @@ const Dashboard = () => {
             <div className="overflow-x-auto">
               <TabsList className="grid w-full min-w-max" style={{ gridTemplateColumns: `repeat(${Object.values(tabSettings).filter(Boolean).length}, 1fr)` }}>
                 {tabSettings.loans && <TabsTrigger value="loans" className="text-xs sm:text-sm">Loans</TabsTrigger>}
-                {tabSettings.customers && <TabsTrigger value="customers" className="text-xs sm:text-sm">Customers</TabsTrigger>}
+                {tabSettings.customers && <TabsTrigger value="customers" className="text-xs sm:text-sm">Loan Customers</TabsTrigger>}
                 {tabSettings.mahajans && <TabsTrigger value="mahajans" className="text-xs sm:text-sm">Mahajans</TabsTrigger>}
-                {tabSettings.bill_customers && <TabsTrigger value="bill_customers" className="text-xs sm:text-sm">Bill Customers</TabsTrigger>}
+                {tabSettings.bill_customers && <TabsTrigger value="bill_customers" className="text-xs sm:text-sm">Sale Customers</TabsTrigger>}
                 {tabSettings.daywise && <TabsTrigger value="daywise" className="text-xs sm:text-sm">Collection</TabsTrigger>}
                 {tabSettings.payments && <TabsTrigger value="payments" className="text-xs sm:text-sm">Payments</TabsTrigger>}
               </TabsList>
