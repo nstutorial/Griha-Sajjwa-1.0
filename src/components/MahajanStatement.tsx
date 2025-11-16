@@ -399,23 +399,32 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
       }
     });
 
-    // Add partner transactions
+    // Add partner transactions (only if they didn't result in advance payment)
     partnerTransactions.forEach(partnerTrans => {
       const transDate = new Date(partnerTrans.payment_date);
       const isInRange = (!startDate || transDate >= new Date(startDate)) && 
                        (!endDate || transDate <= new Date(endDate));
 
       if (isInRange) {
-        const partnerName = partnerTrans.partners?.name || 'Unknown Partner';
-        allEntries.push({
-          date: partnerTrans.payment_date,
-          description: `Partner Payment from ${partnerName}${partnerTrans.notes ? ' - ' + partnerTrans.notes : ''}`,
-          reference: 'PARTNER',
-          debit: 0,
-          credit: partnerTrans.amount,
-          balance: 0, // Will be calculated after sorting
-          type: 'partner_payment'
-        });
+        // Check if there's a corresponding advance payment transaction on the same date
+        const hasAdvancePayment = advancePaymentTransactions.some(advTrans => 
+          advTrans.payment_date === partnerTrans.payment_date &&
+          advTrans.notes?.includes('Overpayment from partner payment')
+        );
+
+        // Only show partner transaction if it didn't result in advance payment
+        if (!hasAdvancePayment) {
+          const partnerName = partnerTrans.partners?.name || 'Unknown Partner';
+          allEntries.push({
+            date: partnerTrans.payment_date,
+            description: `Partner Payment from ${partnerName}${partnerTrans.notes ? ' - ' + partnerTrans.notes : ''}`,
+            reference: 'PARTNER',
+            debit: 0,
+            credit: partnerTrans.amount,
+            balance: 0, // Will be calculated after sorting
+            type: 'partner_payment'
+          });
+        }
       }
     });
 
@@ -426,9 +435,21 @@ const MahajanStatement: React.FC<MahajanStatementProps> = ({ mahajan }) => {
                        (!endDate || transDate <= new Date(endDate));
 
       if (isInRange) {
+        let description = 'Advance Payment';
+        
+        // If this is from a partner payment, format it specially
+        if (advanceTrans.notes?.includes('Overpayment from partner payment')) {
+          const partnerMatch = advanceTrans.notes.match(/FROM\s+([^-]+?)(?:\s*-\s*(.+))?$/);
+          const partnerName = partnerMatch ? partnerMatch[1].trim() : 'Partner';
+          const additionalNotes = partnerMatch?.[2]?.trim();
+          description = `Advance Payment (Overpayment from ${partnerName})${additionalNotes ? ' - ' + additionalNotes : ''}`;
+        } else if (advanceTrans.notes) {
+          description = `Advance Payment - ${advanceTrans.notes}`;
+        }
+        
         allEntries.push({
           date: advanceTrans.payment_date,
-          description: `Advance Payment${advanceTrans.notes ? ' - ' + advanceTrans.notes : ''}`,
+          description,
           reference: 'ADVANCE',
           debit: 0,
           credit: advanceTrans.amount,

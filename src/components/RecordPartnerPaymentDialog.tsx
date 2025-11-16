@@ -197,7 +197,7 @@ export function RecordPartnerPaymentDialog({
                   amount: remainingAmount,
                   payment_date: paymentDate,
                   payment_mode: paymentMode as 'cash' | 'bank',
-                  notes: `Overpayment from partner payment${notes ? ' - ' + notes : ''}`,
+                  notes: `Overpayment from partner payment - FROM ${partnerName}${notes ? ' - ' + notes : ''}`,
                 });
             }
           } catch (err) {
