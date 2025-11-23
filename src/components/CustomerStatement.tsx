@@ -63,6 +63,13 @@ interface CustomerStatementProps {
   customer: Customer;
 }
 
+// Helper: Removes any symbols before a number, e.g. "₹1,00,000.12" => "100000.12"
+// Leaves the minus if negative, and leaves decimal, only numbers and dot and minus remain (from leftmost number onwards)
+const removeSymbolsBeforeNumber = (s: string) => {
+  const match = s.match(/-?\d[\d,\.]*/);
+  return match ? match[0].replace(/,/g, '') : s;
+};
+
 const CustomerStatement: React.FC<CustomerStatementProps> = ({ customer }) => {
   const { user } = useAuth();
   const { toast } = useToast();
@@ -146,7 +153,7 @@ const CustomerStatement: React.FC<CustomerStatementProps> = ({ customer }) => {
         const loanAmount = loan.total_outstanding || loan.principal_amount;
         allEntries.push({
           date: loan.loan_date,
-           description: `Loan - ${loan.description}${loan.processing_fee ? ` (Inc. Processing Fee: ${loan.processing_fee.toFixed(2)})` : ''}`,
+          description: `Loan - ${loan.description}${loan.processing_fee ? ` (Inc. Processing Fee: ${loan.processing_fee.toFixed(2)})` : ''}`,
           reference: loan.loan_number,
           debit: loanAmount,
           credit: 0,
@@ -194,22 +201,20 @@ const CustomerStatement: React.FC<CustomerStatementProps> = ({ customer }) => {
   };
 
   const calculateLoanBalance = (loanId: string) => {
-  const loan = loans.find(l => l.id === loanId);
-  if (!loan) return 0;
+    const loan = loans.find(l => l.id === loanId);
+    if (!loan) return 0;
 
-  const loanTransactions = transactions.filter(t => t.loan_id === loanId);
-  const totalCollected = loanTransactions.reduce((sum, t) => sum + t.amount, 0);
+    const loanTransactions = transactions.filter(t => t.loan_id === loanId);
+    const totalCollected = loanTransactions.reduce((sum, t) => sum + t.amount, 0);
 
-  // Total disbursed = principal + processing fee (if exists)
-  const totalDisbursed = (loan.total_outstanding ?? 0) > 0
-    ? loan.total_outstanding
-    : loan.principal_amount + (loan.processing_fee || 0);
+    // Total disbursed = principal + processing fee (if exists)
+    const totalDisbursed = (loan.total_outstanding ?? 0) > 0
+      ? loan.total_outstanding
+      : loan.principal_amount + (loan.processing_fee || 0);
 
-  const remaining = totalDisbursed - totalCollected;
-  return remaining > 0 ? remaining : 0; // prevent negative balances
-};
-
-
+    const remaining = totalDisbursed - totalCollected;
+    return remaining > 0 ? remaining : 0; // prevent negative balances
+  };
 
   const calculateInterest = (loan: Loan, balance: number) => {
     if (!loan.interest_rate || loan.interest_type === 'none') return 0;
@@ -241,6 +246,7 @@ const CustomerStatement: React.FC<CustomerStatementProps> = ({ customer }) => {
     }, 0);
   };
 
+  // Format currency, but remove any leading symbol for statement
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
@@ -248,192 +254,195 @@ const CustomerStatement: React.FC<CustomerStatementProps> = ({ customer }) => {
     }).format(amount);
   };
 
+  // New: Formats the number for statement (removes rupee symbol etc.)
+  const formattedNumericValue = (amount: number) => removeSymbolsBeforeNumber(formatCurrency(amount));
+
   const exportToPDF = async () => {
-  try {
-    const doc = new jsPDF("p", "mm", "a4"); // Portrait, mm, A4
-    const pageWidth = doc.internal.pageSize.width;
-    const pageHeight = doc.internal.pageSize.height;
-    const margin = 20;
-    const tableWidth = pageWidth - margin * 2;
+    try {
+      const doc = new jsPDF("p", "mm", "a4"); // Portrait, mm, A4
+      const pageWidth = doc.internal.pageSize.width;
+      const pageHeight = doc.internal.pageSize.height;
+      const margin = 20;
+      const tableWidth = pageWidth - margin * 2;
 
-    // Helper to strip all non-digit, non-dot, non-minus chars
-    const getNumberText = (amount: number) =>
-      amount > 0 ? formatCurrency(amount).replace(/[^\d.-]/g, "") : "-";
+      // Helper to strip all non-digit, non-dot, non-minus chars
+      const getNumberText = (amount: number) =>
+        amount > 0 ? removeSymbolsBeforeNumber(formatCurrency(amount)) : "-";
 
-    // ---------------- HEADER ----------------
-    doc.setFontSize(16).setFont("helvetica", "bold");
-    doc.text("Customer Statement", pageWidth / 2, 20, { align: "center" });
+      // ---------------- HEADER ----------------
+      doc.setFontSize(16).setFont("helvetica", "bold");
+      doc.text("Customer Statement", pageWidth / 2, 20, { align: "center" });
 
-    doc.setFontSize(14);
-    doc.text(customer.name, pageWidth / 2, 30, { align: "center" });
-
-    doc.setLineWidth(0.5);
-    doc.line(30, 35, pageWidth - 30, 35);
-
-    let y = 45;
-
-    // ---------------- CUSTOMER INFO ----------------
-    doc.setFontSize(10).setFont("helvetica", "normal");
-    doc.text(`Customer: ${customer.name}`, margin, y); y += 6;
-    doc.text(`Phone: ${customer.phone || "N/A"}`, margin, y); y += 6;
-    doc.text(`Address: ${customer.address || "N/A"}`, margin, y); y += 6;
-    doc.text(
-      `Statement Period: ${startDate ? format(new Date(startDate), "dd/MM/yyyy") : "All"} - ${endDate ? format(new Date(endDate), "dd/MM/yyyy") : "Current"}`,
-      margin,
-      y
-    );
-    y += 15;
-
-    // ---------------- TABLE HEADERS ----------------
-    doc.setFontSize(9).setFont("helvetica", "bold");
-
-    const colWidths = [
-      tableWidth * 0.15, // Date
-      tableWidth * 0.25, // Description
-      tableWidth * 0.10, // Ref
-      tableWidth * 0.15, // Debit
-      tableWidth * 0.15, // Credit
-      tableWidth * 0.20, // Balance
-    ];
-
-    const drawTableHeader = (yPos: number) => {
-      let colX = margin;
-      const headers = ["Date", "Description", "Ref", "Debit", "Credit", "Balance"];
-      headers.forEach((header, i) => {
-        const align = i === 1 ? "left" : "center";
-        const offset = i === 1 ? 2 : colWidths[i] / 2;
-        doc.text(header, colX + offset, yPos, { align });
-        colX += colWidths[i];
-      });
+      doc.setFontSize(14);
+      doc.text(customer.name, pageWidth / 2, 30, { align: "center" });
 
       doc.setLineWidth(0.5);
-      doc.rect(margin, yPos - 5, tableWidth, 8);
+      doc.line(30, 35, pageWidth - 30, 35);
 
-      colX = margin;
-      for (let i = 0; i < colWidths.length - 1; i++) {
-        colX += colWidths[i];
-        doc.line(colX, yPos - 5, colX, yPos + 3);
-      }
-    };
+      let y = 45;
 
-    drawTableHeader(y);
-    y += 2;
+      // ---------------- CUSTOMER INFO ----------------
+      doc.setFontSize(10).setFont("helvetica", "normal");
+      doc.text(`Customer: ${customer.name}`, margin, y); y += 6;
+      doc.text(`Phone: ${customer.phone || "N/A"}`, margin, y); y += 6;
+      doc.text(`Address: ${customer.address || "N/A"}`, margin, y); y += 6;
+      doc.text(
+        `Statement Period: ${startDate ? format(new Date(startDate), "dd/MM/yyyy") : "All"} - ${endDate ? format(new Date(endDate), "dd/MM/yyyy") : "Current"}`,
+        margin,
+        y
+      );
+      y += 15;
 
-    // ---------------- TABLE ROWS ----------------
-    doc.setFont("helvetica", "normal");
+      // ---------------- TABLE HEADERS ----------------
+      doc.setFontSize(9).setFont("helvetica", "bold");
 
-    statement.forEach((entry) => {
-      const descLines = doc.splitTextToSize(entry.description, colWidths[1] - 4);
-      const rowHeight = Math.max(8, descLines.length * 5 + 4);
+      const colWidths = [
+        tableWidth * 0.15, // Date
+        tableWidth * 0.25, // Description
+        tableWidth * 0.10, // Ref
+        tableWidth * 0.15, // Debit
+        tableWidth * 0.15, // Credit
+        tableWidth * 0.20, // Balance
+      ];
 
-      if (y + rowHeight > pageHeight - 30) {
-        doc.addPage();
-        y = 20;
-        drawTableHeader(y);
-        y += 8;
-      }
+      const drawTableHeader = (yPos: number) => {
+        let colX = margin;
+        const headers = ["Date", "Description", "Ref", "Debit", "Credit", "Balance"];
+        headers.forEach((header, i) => {
+          const align = i === 1 ? "left" : "center";
+          const offset = i === 1 ? 2 : colWidths[i] / 2;
+          doc.text(header, colX + offset, yPos, { align });
+          colX += colWidths[i];
+        });
 
-      let colX = margin;
-      const date = format(new Date(entry.date), "dd/MM/yyyy");
-      const reference = entry.reference.length > 8 ? entry.reference.slice(0, 6) + "..." : entry.reference;
-      const debitText = getNumberText(entry.debit);
-      const creditText = getNumberText(entry.credit);
-      const balanceText = formatCurrency(entry.balance).replace(/[^\d.-]/g, "");
+        doc.setLineWidth(0.5);
+        doc.rect(margin, yPos - 5, tableWidth, 8);
 
-      // Date
-      doc.text(date, colX + colWidths[0] / 2, y + 4, { align: "center" });
-      colX += colWidths[0];
+        colX = margin;
+        for (let i = 0; i < colWidths.length - 1; i++) {
+          colX += colWidths[i];
+          doc.line(colX, yPos - 5, colX, yPos + 3);
+        }
+      };
 
-      // Description
-      descLines.forEach((line, i) => {
-        doc.text(line, colX + 2, y + 4 + i * 5);
-      });
-      colX += colWidths[1];
+      drawTableHeader(y);
+      y += 2;
 
-      // Ref
-      doc.text(reference, colX + colWidths[2] / 2, y + 4, { align: "center" });
-      colX += colWidths[2];
-
-      // Debit (red)
-      doc.setTextColor(255, 0, 0);
-      doc.text(debitText, colX + colWidths[3] / 2, y + 4, { align: "center" });
-      colX += colWidths[3];
-
-      // Credit (green)
-      doc.setTextColor(0, 128, 0);
-      doc.text(creditText, colX + colWidths[4] / 2, y + 4, { align: "center" });
-      colX += colWidths[4];
-
-      // Balance (black bold)
-      doc.setTextColor(0, 0, 0);
-      doc.setFont("helvetica", "bold");
-      doc.text(balanceText, colX + colWidths[5] / 2, y + 4, { align: "center" });
-
-      // Reset font
+      // ---------------- TABLE ROWS ----------------
       doc.setFont("helvetica", "normal");
 
-      // Draw row borders
-      colX = margin;
-      for (let i = 0; i < colWidths.length; i++) {
-        doc.rect(colX, y, colWidths[i], rowHeight);
-        colX += colWidths[i];
+      statement.forEach((entry) => {
+        const descLines = doc.splitTextToSize(entry.description, colWidths[1] - 4);
+        const rowHeight = Math.max(8, descLines.length * 5 + 4);
+
+        if (y + rowHeight > pageHeight - 30) {
+          doc.addPage();
+          y = 20;
+          drawTableHeader(y);
+          y += 8;
+        }
+
+        let colX = margin;
+        const date = format(new Date(entry.date), "dd/MM/yyyy");
+        const reference = entry.reference.length > 8 ? entry.reference.slice(0, 6) + "..." : entry.reference;
+        const debitText = getNumberText(entry.debit);
+        const creditText = getNumberText(entry.credit);
+        const balanceText = removeSymbolsBeforeNumber(formatCurrency(entry.balance));
+
+        // Date
+        doc.text(date, colX + colWidths[0] / 2, y + 4, { align: "center" });
+        colX += colWidths[0];
+
+        // Description
+        descLines.forEach((line, i) => {
+          doc.text(line, colX + 2, y + 4 + i * 5);
+        });
+        colX += colWidths[1];
+
+        // Ref
+        doc.text(reference, colX + colWidths[2] / 2, y + 4, { align: "center" });
+        colX += colWidths[2];
+
+        // Debit (red)
+        doc.setTextColor(255, 0, 0);
+        doc.text(debitText, colX + colWidths[3] / 2, y + 4, { align: "center" });
+        colX += colWidths[3];
+
+        // Credit (green)
+        doc.setTextColor(0, 128, 0);
+        doc.text(creditText, colX + colWidths[4] / 2, y + 4, { align: "center" });
+        colX += colWidths[4];
+
+        // Balance (black bold)
+        doc.setTextColor(0, 0, 0);
+        doc.setFont("helvetica", "bold");
+        doc.text(balanceText, colX + colWidths[5] / 2, y + 4, { align: "center" });
+
+        // Reset font
+        doc.setFont("helvetica", "normal");
+
+        // Draw row borders
+        colX = margin;
+        for (let i = 0; i < colWidths.length; i++) {
+          doc.rect(colX, y, colWidths[i], rowHeight);
+          colX += colWidths[i];
+        }
+
+        y += rowHeight;
+      });
+
+      // ---------------- SUMMARY ----------------
+      if (y + 30 > pageHeight - 20) {
+        doc.addPage();
+        y = 20;
       }
 
-      y += rowHeight;
-    });
+      // Add top margin/padding before Account Summary
+      y += 20;
 
-    // ---------------- SUMMARY ----------------
-    if (y + 30 > pageHeight - 20) {
-      doc.addPage();
-      y = 20;
+      doc.setFontSize(12).setFont("helvetica", "bold");
+      doc.text("Account Summary", margin, y); 
+      y += 15;
+
+      doc.setFillColor(249, 249, 249);
+      doc.rect(margin, y - 5, tableWidth, 20, "F");
+
+      doc.setFontSize(10).setFont("helvetica", "normal");
+      doc.text(
+        `Total Outstanding Balance: ${removeSymbolsBeforeNumber(formatCurrency(calculateTotalOutstanding()))}`,
+        margin + 5,
+        y
+      );
+      y += 6;
+      doc.text(`Total Transactions: ${statement.length}`, margin + 5, y);
+
+      // ---------------- FOOTER ---------------- 
+      const pageCount = doc.getNumberOfPages();
+      for (let i = 1; i <= pageCount; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.text(`Page ${i} of ${pageCount}`, pageWidth - margin, pageHeight - 10, { align: "right" });
+      }
+
+      // ---------------- SAVE ----------------
+      const pdfName = `customer-statement-${customer.name.replace(/\s+/g, "-").toLowerCase()}-${format(new Date(), "yyyy-MM-dd")}.pdf`;
+      const pdfBlob = doc.output("blob");
+      saveAs(pdfBlob, pdfName);
+
+      toast({
+        title: "PDF Downloaded",
+        description: "Customer statement has been downloaded as PDF.",
+      });
+
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to generate PDF statement",
+      });
     }
-
-    // Add top margin/padding before Account Summary
-    y += 20;
-
-    doc.setFontSize(12).setFont("helvetica", "bold");
-    doc.text("Account Summary", margin, y); 
-    y += 15;
-
-    doc.setFillColor(249, 249, 249);
-    doc.rect(margin, y - 5, tableWidth, 20, "F");
-
-    doc.setFontSize(10).setFont("helvetica", "normal");
-    doc.text(
-      `Total Outstanding Balance: ${formatCurrency(calculateTotalOutstanding()).replace(/[^\d.-]/g, "")}`,
-      margin + 5,
-      y
-    );
-    y += 6;
-    doc.text(`Total Transactions: ${statement.length}`, margin + 5, y);
-
-    // ---------------- FOOTER ---------------- 
-    const pageCount = doc.getNumberOfPages();
-    for (let i = 1; i <= pageCount; i++) {
-      doc.setPage(i);
-      doc.setFontSize(8);
-      doc.text(`Page ${i} of ${pageCount}`, pageWidth - margin, pageHeight - 10, { align: "right" });
-    }
-
-    // ---------------- SAVE ----------------
-    const pdfName = `customer-statement-${customer.name.replace(/\s+/g, "-").toLowerCase()}-${format(new Date(), "yyyy-MM-dd")}.pdf`;
-    const pdfBlob = doc.output("blob");
-    saveAs(pdfBlob, pdfName);
-
-    toast({
-      title: "PDF Downloaded",
-      description: "Customer statement has been downloaded as PDF.",
-    });
-
-  } catch (error) {
-    console.error("Error generating PDF:", error);
-    toast({
-      variant: "destructive",
-      title: "Error",
-      description: "Failed to generate PDF statement",
-    });
-  }
-};
+  };
 
   return (
     <div className="space-y-6">
@@ -483,7 +492,7 @@ const CustomerStatement: React.FC<CustomerStatementProps> = ({ customer }) => {
               <div className="text-sm text-green-600">Total Payments</div>
             </div>
             <div className="text-center p-4 bg-orange-50 rounded-lg">
-              <div className="text-2xl font-bold text-orange-600">{formatCurrency(calculateTotalOutstanding())}</div>
+              <div className="text-2xl font-bold text-orange-600">{formattedNumericValue(calculateTotalOutstanding())}</div>
               <div className="text-sm text-orange-600">Outstanding Balance</div>
             </div>
           </div>
@@ -533,19 +542,19 @@ const CustomerStatement: React.FC<CustomerStatementProps> = ({ customer }) => {
                       <td className="p-3 text-sm text-gray-600">{entry.reference}</td>
                       <td className="p-3 text-right">
                         {entry.debit > 0 ? (
-                          <span className="text-red-600 font-medium">{formatCurrency(entry.debit)}</span>
+                          <span className="text-red-600 font-medium">{formattedNumericValue(entry.debit)}</span>
                         ) : (
                           <span className="text-gray-400">-</span>
                         )}
                       </td>
                       <td className="p-3 text-right">
                         {entry.credit > 0 ? (
-                          <span className="text-green-600 font-medium">{formatCurrency(entry.credit)}</span>
+                          <span className="text-green-600 font-medium">{formattedNumericValue(entry.credit)}</span>
                         ) : (
                           <span className="text-gray-400">-</span>
                         )}
                       </td>
-                      <td className="p-3 text-right font-medium">{formatCurrency(entry.balance)}</td>
+                      <td className="p-3 text-right font-medium">{formattedNumericValue(entry.balance)}</td>
                     </tr>
                   ))}
                 </tbody>
