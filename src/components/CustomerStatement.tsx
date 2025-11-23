@@ -77,16 +77,21 @@ const CustomerStatement: React.FC<CustomerStatementProps> = ({ customer }) => {
   const [endDate, setEndDate] = useState<string>('');
   const [loading, setLoading] = useState(false);
 
+  // NEW STATE
+  const [showFullDescription, setShowFullDescription] = useState(false);
+
   useEffect(() => {
     if (user) {
       fetchCustomerData();
     }
+    // eslint-disable-next-line
   }, [user, customer.id]);
 
   useEffect(() => {
     if (loans.length > 0) {
       generateStatement();
     }
+    // eslint-disable-next-line
   }, [loans, transactions, startDate, endDate]);
 
   const fetchCustomerData = async () => {
@@ -225,6 +230,12 @@ const CustomerStatement: React.FC<CustomerStatementProps> = ({ customer }) => {
   // Consistently show numbers WITHOUT currency symbols in UI & PDF
   const displayNumber = (amount: number) => removeSymbolsBeforeNumber(formatCurrency(amount));
 
+  // Helper: show either full or last 75 chars
+  const getDescriptionText = (desc: string) => {
+    if (showFullDescription || desc.length <= 75) return desc;
+    return desc.slice(-75);
+  };
+
   const exportToPDF = async () => {
     try {
       const doc = new jsPDF("p", "mm", "a4");
@@ -286,7 +297,9 @@ const CustomerStatement: React.FC<CustomerStatementProps> = ({ customer }) => {
 
       doc.setFont("helvetica", "normal");
       statement.forEach((entry) => {
-        const descLines = doc.splitTextToSize(entry.description, colWidths[1] - 4);
+        // Respect the toggle on PDF too:
+        const descText = getDescriptionText(entry.description);
+        const descLines = doc.splitTextToSize(descText, colWidths[1] - 4);
         const rowHeight = Math.max(8, descLines.length * 5 + 4);
         if (y + rowHeight > pageHeight - 30) {
           doc.addPage();
@@ -423,6 +436,16 @@ const CustomerStatement: React.FC<CustomerStatementProps> = ({ customer }) => {
       <Card>
         <CardHeader>
           <CardTitle>Transaction Statement</CardTitle>
+          <div className="mt-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowFullDescription(val => !val)}
+              className="px-2 py-1"
+            >
+              {showFullDescription ? 'Hide Long Description' : 'Show Full Description'}
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -433,7 +456,18 @@ const CustomerStatement: React.FC<CustomerStatementProps> = ({ customer }) => {
                 <thead>
                   <tr className="border-b">
                     <th className="text-left p-3 font-medium">Date</th>
-                    <th className="text-left p-3 font-medium">Description</th>
+                    <th className="text-left p-3 font-medium">
+                      Description
+                      <Button
+                        variant="link"
+                        size="xs"
+                        onClick={() => setShowFullDescription(val => !val)}
+                        className="ml-2 p-0"
+                        tabIndex={-1}
+                      >
+                        {showFullDescription ? "Hide" : "Show"}
+                      </Button>
+                    </th>
                     <th className="text-left p-3 font-medium">Reference</th>
                     <th className="text-right p-3 font-medium">Debit</th>
                     <th className="text-right p-3 font-medium">Credit</th>
@@ -446,16 +480,21 @@ const CustomerStatement: React.FC<CustomerStatementProps> = ({ customer }) => {
                       <td className="p-3 text-sm">{format(new Date(entry.date), 'dd/MM/yyyy')}</td>
                       <td className="p-3">
                         <div className="flex items-center gap-2">
-                          <span>{entry.description}</span>
+                          <span title={showFullDescription ? undefined : entry.description}>
+                            {getDescriptionText(entry.description)}
+                            {!showFullDescription && entry.description.length > 75 && (
+                              <span className="text-blue-500 ml-1">…</span>
+                            )}
+                          </span>
                           <Badge
                             variant={
                               entry.type === 'loan_disbursement' ? 'destructive' :
-                              entry.type === 'payment_received' ? 'default' : 'secondary'
+                                entry.type === 'payment_received' ? 'default' : 'secondary'
                             }
                             className="text-xs"
                           >
                             {entry.type === 'loan_disbursement' ? 'Loan' :
-                             entry.type === 'payment_received' ? 'Payment' : 'Interest'}
+                              entry.type === 'payment_received' ? 'Payment' : 'Interest'}
                           </Badge>
                         </div>
                       </td>
