@@ -230,11 +230,12 @@ const CustomerStatement: React.FC<CustomerStatementProps> = ({ customer }) => {
   // Consistently show numbers WITHOUT currency symbols in UI & PDF
   const displayNumber = (amount: number) => removeSymbolsBeforeNumber(formatCurrency(amount));
 
-  // Helper: show either full or last 75 chars
-  const getDescriptionText = (desc: string) => {
-    if (showFullDescription || desc.length <= 75) return desc;
-    return desc.slice(-75);
-  };
+  // Helper: returns the full description, or with last 75 characters hidden
+const getDescriptionText = (desc: string) => {
+  if (showFullDescription || desc.length <= 75) return desc;
+  // Hide last 75 characters
+  return desc.slice(0, desc.length - 75);
+};
 
   const exportToPDF = async () => {
     try {
@@ -437,14 +438,9 @@ const CustomerStatement: React.FC<CustomerStatementProps> = ({ customer }) => {
         <CardHeader>
           <CardTitle>Transaction Statement</CardTitle>
           <div className="mt-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setShowFullDescription(val => !val)}
-              className="px-2 py-1"
-            >
-              {showFullDescription ? 'Hide Long Description' : 'Show Full Description'}
-            </Button>
+           <Button onClick={() => setShowFullDescription(val => !val)}>
+            {showFullDescription ? 'Hide last 75 chars' : 'Show Full Description'}
+          </Button>
           </div>
         </CardHeader>
         <CardContent>
