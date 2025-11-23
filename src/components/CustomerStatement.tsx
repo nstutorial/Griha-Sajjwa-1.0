@@ -249,183 +249,191 @@ const CustomerStatement: React.FC<CustomerStatementProps> = ({ customer }) => {
   };
 
   const exportToPDF = async () => {
-    try {
-      const doc = new jsPDF("p", "mm", "a4"); // Portrait, mm, A4
-      const pageWidth = doc.internal.pageSize.width;
-      const pageHeight = doc.internal.pageSize.height;
-      const margin = 20;
-      const tableWidth = pageWidth - margin * 2;
-  
-      // ---------------- HEADER ----------------
-      doc.setFontSize(16).setFont("helvetica", "bold");
-      doc.text("Customer Statement", pageWidth / 2, 20, { align: "center" });
-  
-      doc.setFontSize(14);
-      doc.text(customer.name, pageWidth / 2, 30, { align: "center" });
-  
-      doc.setLineWidth(0.5);
-      doc.line(30, 35, pageWidth - 30, 35);
-  
-      let y = 45;
-  
-      // ---------------- CUSTOMER INFO ----------------
-      doc.setFontSize(10).setFont("helvetica", "normal");
-      doc.text(`Customer: ${customer.name}`, margin, y); y += 6;
-      doc.text(`Phone: ${customer.phone || "N/A"}`, margin, y); y += 6;
-      doc.text(`Address: ${customer.address || "N/A"}`, margin, y); y += 6;
-      doc.text(
-        `Statement Period: ${startDate ? format(new Date(startDate), "dd/MM/yyyy") : "All"} - ${endDate ? format(new Date(endDate), "dd/MM/yyyy") : "Current"}`,
-        margin,
-        y
-      );
-      y += 15;
-  
-      // ---------------- TABLE HEADERS ----------------
-      doc.setFontSize(9).setFont("helvetica", "bold");
-  
-      const colWidths = [
-        tableWidth * 0.15, // Date
-        tableWidth * 0.25, // Description
-        tableWidth * 0.10, // Ref
-        tableWidth * 0.15, // Debit
-        tableWidth * 0.15, // Credit
-        tableWidth * 0.20, // Balance
-      ];
-  
-      const drawTableHeader = (yPos: number) => {
-        let colX = margin;
-        const headers = ["Date", "Description", "Ref", "Debit", "Credit", "Balance"];
-        headers.forEach((header, i) => {
-          const align = i === 1 ? "left" : "center";
-          const offset = i === 1 ? 2 : colWidths[i] / 2;
-          doc.text(header, colX + offset, yPos, { align });
-          colX += colWidths[i];
-        });
-  
-        doc.setLineWidth(0.5);
-        doc.rect(margin, yPos - 5, tableWidth, 8);
-  
-        colX = margin;
-        for (let i = 0; i < colWidths.length - 1; i++) {
-          colX += colWidths[i];
-          doc.line(colX, yPos - 5, colX, yPos + 3);
-        }
-      };
-  
-      drawTableHeader(y);
-      y += 2;
-  
-      // ---------------- TABLE ROWS ----------------
-      doc.setFont("helvetica", "normal");
-  
-      statement.forEach((entry) => {
-        const descLines = doc.splitTextToSize(entry.description, colWidths[1] - 4);
-        const rowHeight = Math.max(8, descLines.length * 5 + 4);
-  
-        if (y + rowHeight > pageHeight - 30) {
-          doc.addPage();
-          y = 20;
-          drawTableHeader(y);
-          y += 8;
-        }
-  
-        let colX = margin;
-        const date = format(new Date(entry.date), "dd/MM/yyyy");
-        const reference = entry.reference.length > 8 ? entry.reference.slice(0, 6) + "..." : entry.reference;
-        const debitText = entry.debit > 0 ? formatCurrency(entry.debit).replace("₹", "") : "-";
-        const creditText = entry.credit > 0 ? formatCurrency(entry.credit).replace("₹", "") : "-";
-        const balanceText = formatCurrency(entry.balance).replace("₹", "");
-  
-        // Date
-        doc.text(date, colX + colWidths[0] / 2, y + 4, { align: "center" });
-        colX += colWidths[0];
-  
-        // Description
-        descLines.forEach((line, i) => {
-          doc.text(line, colX + 2, y + 4 + i * 5);
-        });
-        colX += colWidths[1];
-  
-        // Ref
-        doc.text(reference, colX + colWidths[2] / 2, y + 4, { align: "center" });
-        colX += colWidths[2];
-  
-        // Debit (red)
-        doc.setTextColor(255, 0, 0);
-        doc.text(debitText, colX + colWidths[3] / 2, y + 4, { align: "center" });
-        colX += colWidths[3];
-  
-        // Credit (green)
-        doc.setTextColor(0, 128, 0);
-        doc.text(creditText, colX + colWidths[4] / 2, y + 4, { align: "center" });
-        colX += colWidths[4];
-  
-        // Balance (black bold)
-        doc.setTextColor(0, 0, 0);
-        doc.setFont("helvetica", "bold");
-        doc.text(balanceText, colX + colWidths[5] / 2, y + 4, { align: "center" });
-  
-        // Reset font
-        doc.setFont("helvetica", "normal");
-  
-        // Draw row borders
-        colX = margin;
-        for (let i = 0; i < colWidths.length; i++) {
-          doc.rect(colX, y, colWidths[i], rowHeight);
-          colX += colWidths[i];
-        }
-  
-        y += rowHeight;
+  try {
+    const doc = new jsPDF("p", "mm", "a4"); // Portrait, mm, A4
+    const pageWidth = doc.internal.pageSize.width;
+    const pageHeight = doc.internal.pageSize.height;
+    const margin = 20;
+    const tableWidth = pageWidth - margin * 2;
+
+    // Helper to strip all non-digit, non-dot, non-minus chars
+    const getNumberText = (amount: number) =>
+      amount > 0 ? formatCurrency(amount).replace(/[^\d.-]/g, "") : "-";
+
+    // ---------------- HEADER ----------------
+    doc.setFontSize(16).setFont("helvetica", "bold");
+    doc.text("Customer Statement", pageWidth / 2, 20, { align: "center" });
+
+    doc.setFontSize(14);
+    doc.text(customer.name, pageWidth / 2, 30, { align: "center" });
+
+    doc.setLineWidth(0.5);
+    doc.line(30, 35, pageWidth - 30, 35);
+
+    let y = 45;
+
+    // ---------------- CUSTOMER INFO ----------------
+    doc.setFontSize(10).setFont("helvetica", "normal");
+    doc.text(`Customer: ${customer.name}`, margin, y); y += 6;
+    doc.text(`Phone: ${customer.phone || "N/A"}`, margin, y); y += 6;
+    doc.text(`Address: ${customer.address || "N/A"}`, margin, y); y += 6;
+    doc.text(
+      `Statement Period: ${startDate ? format(new Date(startDate), "dd/MM/yyyy") : "All"} - ${endDate ? format(new Date(endDate), "dd/MM/yyyy") : "Current"}`,
+      margin,
+      y
+    );
+    y += 15;
+
+    // ---------------- TABLE HEADERS ----------------
+    doc.setFontSize(9).setFont("helvetica", "bold");
+
+    const colWidths = [
+      tableWidth * 0.15, // Date
+      tableWidth * 0.25, // Description
+      tableWidth * 0.10, // Ref
+      tableWidth * 0.15, // Debit
+      tableWidth * 0.15, // Credit
+      tableWidth * 0.20, // Balance
+    ];
+
+    const drawTableHeader = (yPos: number) => {
+      let colX = margin;
+      const headers = ["Date", "Description", "Ref", "Debit", "Credit", "Balance"];
+      headers.forEach((header, i) => {
+        const align = i === 1 ? "left" : "center";
+        const offset = i === 1 ? 2 : colWidths[i] / 2;
+        doc.text(header, colX + offset, yPos, { align });
+        colX += colWidths[i];
       });
-  
-      // ---------------- SUMMARY ----------------
-      if (y + 30 > pageHeight - 20) {
+
+      doc.setLineWidth(0.5);
+      doc.rect(margin, yPos - 5, tableWidth, 8);
+
+      colX = margin;
+      for (let i = 0; i < colWidths.length - 1; i++) {
+        colX += colWidths[i];
+        doc.line(colX, yPos - 5, colX, yPos + 3);
+      }
+    };
+
+    drawTableHeader(y);
+    y += 2;
+
+    // ---------------- TABLE ROWS ----------------
+    doc.setFont("helvetica", "normal");
+
+    statement.forEach((entry) => {
+      const descLines = doc.splitTextToSize(entry.description, colWidths[1] - 4);
+      const rowHeight = Math.max(8, descLines.length * 5 + 4);
+
+      if (y + rowHeight > pageHeight - 30) {
         doc.addPage();
         y = 20;
+        drawTableHeader(y);
+        y += 8;
       }
 
-      // Add top margin/padding before Account Summary
-      y += 20;
+      let colX = margin;
+      const date = format(new Date(entry.date), "dd/MM/yyyy");
+      const reference = entry.reference.length > 8 ? entry.reference.slice(0, 6) + "..." : entry.reference;
+      const debitText = getNumberText(entry.debit);
+      const creditText = getNumberText(entry.credit);
+      const balanceText = formatCurrency(entry.balance).replace(/[^\d.-]/g, "");
 
-      doc.setFontSize(12).setFont("helvetica", "bold");
-      doc.text("Account Summary", margin, y); 
-      y += 15;
-  
-      doc.setFillColor(249, 249, 249);
-      doc.rect(margin, y - 5, tableWidth, 20, "F");
-  
-      doc.setFontSize(10).setFont("helvetica", "normal");
-      doc.text(`Total Outstanding Balance: ${formatCurrency(calculateTotalOutstanding()).replace("₹", "")}`, margin + 5, y);
-      y += 6;
-      doc.text(`Total Transactions: ${statement.length}`, margin + 5, y);
-  
-      // ---------------- FOOTER ---------------- 
-      const pageCount = doc.getNumberOfPages();
-      for (let i = 1; i <= pageCount; i++) {
-        doc.setPage(i);
-        doc.setFontSize(8);
-        doc.text(`Page ${i} of ${pageCount}`, pageWidth - margin, pageHeight - 10, { align: "right" });
+      // Date
+      doc.text(date, colX + colWidths[0] / 2, y + 4, { align: "center" });
+      colX += colWidths[0];
+
+      // Description
+      descLines.forEach((line, i) => {
+        doc.text(line, colX + 2, y + 4 + i * 5);
+      });
+      colX += colWidths[1];
+
+      // Ref
+      doc.text(reference, colX + colWidths[2] / 2, y + 4, { align: "center" });
+      colX += colWidths[2];
+
+      // Debit (red)
+      doc.setTextColor(255, 0, 0);
+      doc.text(debitText, colX + colWidths[3] / 2, y + 4, { align: "center" });
+      colX += colWidths[3];
+
+      // Credit (green)
+      doc.setTextColor(0, 128, 0);
+      doc.text(creditText, colX + colWidths[4] / 2, y + 4, { align: "center" });
+      colX += colWidths[4];
+
+      // Balance (black bold)
+      doc.setTextColor(0, 0, 0);
+      doc.setFont("helvetica", "bold");
+      doc.text(balanceText, colX + colWidths[5] / 2, y + 4, { align: "center" });
+
+      // Reset font
+      doc.setFont("helvetica", "normal");
+
+      // Draw row borders
+      colX = margin;
+      for (let i = 0; i < colWidths.length; i++) {
+        doc.rect(colX, y, colWidths[i], rowHeight);
+        colX += colWidths[i];
       }
-  
-      // ---------------- SAVE ----------------
-      const pdfName = `customer-statement-${customer.name.replace(/\s+/g, "-").toLowerCase()}-${format(new Date(), "yyyy-MM-dd")}.pdf`;
-      const pdfBlob = doc.output("blob");
-      saveAs(pdfBlob, pdfName);
-  
-      toast({
-        title: "PDF Downloaded",
-        description: "Customer statement has been downloaded as PDF.",
-      });
-  
-    } catch (error) {
-      console.error("Error generating PDF:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to generate PDF statement",
-      });
+
+      y += rowHeight;
+    });
+
+    // ---------------- SUMMARY ----------------
+    if (y + 30 > pageHeight - 20) {
+      doc.addPage();
+      y = 20;
     }
-  };
+
+    // Add top margin/padding before Account Summary
+    y += 20;
+
+    doc.setFontSize(12).setFont("helvetica", "bold");
+    doc.text("Account Summary", margin, y); 
+    y += 15;
+
+    doc.setFillColor(249, 249, 249);
+    doc.rect(margin, y - 5, tableWidth, 20, "F");
+
+    doc.setFontSize(10).setFont("helvetica", "normal");
+    doc.text(
+      `Total Outstanding Balance: ${formatCurrency(calculateTotalOutstanding()).replace(/[^\d.-]/g, "")}`,
+      margin + 5,
+      y
+    );
+    y += 6;
+    doc.text(`Total Transactions: ${statement.length}`, margin + 5, y);
+
+    // ---------------- FOOTER ---------------- 
+    const pageCount = doc.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.text(`Page ${i} of ${pageCount}`, pageWidth - margin, pageHeight - 10, { align: "right" });
+    }
+
+    // ---------------- SAVE ----------------
+    const pdfName = `customer-statement-${customer.name.replace(/\s+/g, "-").toLowerCase()}-${format(new Date(), "yyyy-MM-dd")}.pdf`;
+    const pdfBlob = doc.output("blob");
+    saveAs(pdfBlob, pdfName);
+
+    toast({
+      title: "PDF Downloaded",
+      description: "Customer statement has been downloaded as PDF.",
+    });
+
+  } catch (error) {
+    console.error("Error generating PDF:", error);
+    toast({
+      variant: "destructive",
+      title: "Error",
+      description: "Failed to generate PDF statement",
+    });
+  }
+};
 
   return (
     <div className="space-y-6">
