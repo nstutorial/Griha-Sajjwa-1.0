@@ -146,7 +146,7 @@ const CustomerStatement: React.FC<CustomerStatementProps> = ({ customer }) => {
         const loanAmount = loan.total_outstanding || loan.principal_amount;
         allEntries.push({
           date: loan.loan_date,
-           description: `Loan - ${loan.description}${loan.processing_fee ? ` (Inc. Processing Fee: ₹${loan.processing_fee.toFixed(2)})` : ''}`,
+           description: `Loan - ${loan.description}${loan.processing_fee ? ` (Inc. Processing Fee: ${loan.processing_fee.toFixed(2)})` : ''}`,
           reference: loan.loan_number,
           debit: loanAmount,
           credit: 0,
