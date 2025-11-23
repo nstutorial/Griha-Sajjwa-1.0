@@ -62,6 +62,7 @@ interface CustomerStatementProps {
   customer: Customer;
 }
 
+// Remove ANY currency symbols, commas etc.
 const removeSymbolsBeforeNumber = (s: string) => {
   const match = s.match(/-?\d[\d,\.]*/);
   return match ? match[0].replace(/,/g, '') : s;
@@ -70,6 +71,7 @@ const removeSymbolsBeforeNumber = (s: string) => {
 const CustomerStatement: React.FC<CustomerStatementProps> = ({ customer }) => {
   const { user } = useAuth();
   const { toast } = useToast();
+
   const [loans, setLoans] = useState<Loan[]>([]);
   const [transactions, setTransactions] = useState<LoanTransaction[]>([]);
   const [statement, setStatement] = useState<StatementEntry[]>([]);
@@ -92,15 +94,19 @@ const CustomerStatement: React.FC<CustomerStatementProps> = ({ customer }) => {
   const fetchCustomerData = async () => {
     try {
       setLoading(true);
+
       const { data: loansData, error: loansError } = await supabase
         .from('loans')
         .select('*')
         .eq('customer_id', customer.id)
         .eq('user_id', user?.id)
         .order('loan_date', { ascending: false });
+
       if (loansError) throw loansError;
+
       setLoans(loansData || []);
-      if (loansData && loansData.length > 0) {
+
+      if (loansData?.length > 0) {
         const { data: transactionsData, error: transactionsError } = await supabase
           .from('loan_transactions')
           .select(`
@@ -109,8 +115,9 @@ const CustomerStatement: React.FC<CustomerStatementProps> = ({ customer }) => {
           `)
           .in('loan_id', loansData.map(l => l.id))
           .order('payment_date', { ascending: true });
+
         if (transactionsError) throw transactionsError;
-        setTransactions((transactionsData || []) as any);
+        setTransactions(transactionsData || []);
       } else {
         setTransactions([]);
       }
@@ -129,40 +136,48 @@ const CustomerStatement: React.FC<CustomerStatementProps> = ({ customer }) => {
     const statementEntries: StatementEntry[] = [];
     let runningBalance = 0;
     const allEntries: StatementEntry[] = [];
+
     loans.forEach(loan => {
       const loanDate = new Date(loan.loan_date);
-      const isInRange = (!startDate || loanDate >= new Date(startDate)) && 
-                       (!endDate || loanDate <= new Date(endDate));
+      const isInRange =
+        (!startDate || loanDate >= new Date(startDate)) &&
+        (!endDate || loanDate <= new Date(endDate));
+
       if (isInRange) {
         const loanAmount = loan.total_outstanding || loan.principal_amount;
         allEntries.push({
           date: loan.loan_date,
-          description: `Loan - ${loan.description}${loan.processing_fee ? ` (Inc. Processing Fee: ${loan.processing_fee.toFixed(2)})` : ''}`,
+          description: `Loan - ${loan.description}${loan.processing_fee ? ` (Processing Fee: ${loan.processing_fee})` : ''}`,
           reference: loan.loan_number,
           debit: loanAmount,
           credit: 0,
           balance: 0,
-          type: 'loan_disbursement'
+          type: 'loan_disbursement',
         });
       }
     });
+
     transactions.forEach(transaction => {
       const paymentDate = new Date(transaction.payment_date);
-      const isInRange = (!startDate || paymentDate >= new Date(startDate)) && 
-                        (!endDate || paymentDate <= new Date(endDate));
+      const isInRange =
+        (!startDate || paymentDate >= new Date(startDate)) &&
+        (!endDate || paymentDate <= new Date(endDate));
+
       if (isInRange) {
         allEntries.push({
           date: transaction.payment_date,
-          description: `Payment Received - ${transaction.loan.description || 'Loan'} (${transaction.loan.loan_number}) - ${transaction.transaction_type} via ${transaction.payment_mode}`,
+          description: `Payment - ${transaction.loan.description || 'Loan'} (${transaction.loan.loan_number}) - ${transaction.transaction_type} via ${transaction.payment_mode}`,
           reference: transaction.id,
           debit: 0,
           credit: transaction.amount,
           balance: 0,
-          type: 'payment_received'
+          type: 'payment_received',
         });
       }
     });
+
     allEntries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
     allEntries.forEach(entry => {
       if (entry.type === 'loan_disbursement') {
         entry.balance = runningBalance + entry.debit;
@@ -173,37 +188,47 @@ const CustomerStatement: React.FC<CustomerStatementProps> = ({ customer }) => {
       }
       statementEntries.push(entry);
     });
+
     setStatement(statementEntries);
   };
 
   const calculateLoanBalance = (loanId: string) => {
     const loan = loans.find(l => l.id === loanId);
     if (!loan) return 0;
+
     const loanTransactions = transactions.filter(t => t.loan_id === loanId);
     const totalCollected = loanTransactions.reduce((sum, t) => sum + t.amount, 0);
-    const totalDisbursed = (loan.total_outstanding ?? 0) > 0
-      ? loan.total_outstanding
-      : loan.principal_amount + (loan.processing_fee || 0);
+
+    const totalDisbursed =
+      (loan.total_outstanding ?? 0) > 0
+        ? loan.total_outstanding
+        : loan.principal_amount + (loan.processing_fee || 0);
+
     const remaining = totalDisbursed - totalCollected;
     return remaining > 0 ? remaining : 0;
   };
 
   const calculateInterest = (loan: Loan, balance: number) => {
     if (!loan.interest_rate || loan.interest_type === 'none') return 0;
+
     const rate = loan.interest_rate / 100;
     const startDate = new Date(loan.loan_date);
     const endDate = new Date();
+
     if (loan.interest_type === 'daily') {
-      const timeDiff = endDate.getTime() - startDate.getTime();
-      const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
-      return balance * rate * (daysDiff / 365);
-    } else if (loan.interest_type === 'monthly') {
-      const months = (endDate.getFullYear() - startDate.getFullYear()) * 12 + 
-                     (endDate.getMonth() - startDate.getMonth());
-      const daysInMonth = (endDate.getDate() - startDate.getDate()) / 30;
-      const totalMonths = months + daysInMonth;
-      return balance * rate * totalMonths;
+      const diff = endDate.getTime() - startDate.getTime();
+      const days = Math.ceil(diff / (1000 * 3600 * 24));
+      return balance * rate * (days / 365);
     }
+
+    if (loan.interest_type === 'monthly') {
+      const months =
+        (endDate.getFullYear() - startDate.getFullYear()) * 12 +
+        (endDate.getMonth() - startDate.getMonth());
+
+      return balance * rate * months;
+    }
+
     return 0;
   };
 
@@ -215,155 +240,104 @@ const CustomerStatement: React.FC<CustomerStatementProps> = ({ customer }) => {
     }, 0);
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-    }).format(amount);
+  // REMOVE ALL Currency Formats — Only show numbers
+  const displayNumber = (amount: number) => {
+    return amount.toFixed(2).replace(/\.00$/, '');
   };
-
-  // Consistently show numbers WITHOUT currency symbols in UI & PDF
-  const displayNumber = (amount: number) => removeSymbolsBeforeNumber(formatCurrency(amount));
 
   const exportToPDF = async () => {
     try {
       const doc = new jsPDF("p", "mm", "a4");
+
       const pageWidth = doc.internal.pageSize.width;
       const pageHeight = doc.internal.pageSize.height;
       const margin = 20;
       const tableWidth = pageWidth - margin * 2;
 
-      // Use our custom displayNumber function for all numbers
-      const getNumberText = (amount: number) =>
-        amount > 0 ? displayNumber(amount) : "-";
+      const getText = (num: number) => (num > 0 ? displayNumber(num) : "-");
 
       doc.setFontSize(16).setFont("helvetica", "bold");
       doc.text("Customer Statement", pageWidth / 2, 20, { align: "center" });
-      doc.setFontSize(14);
-      doc.text(customer.name, pageWidth / 2, 30, { align: "center" });
-      doc.setLineWidth(0.5);
-      doc.line(30, 35, pageWidth - 30, 35);
-      let y = 45;
-      doc.setFontSize(10).setFont("helvetica", "normal");
+
+      doc.setFontSize(10);
+      let y = 40;
+
       doc.text(`Customer: ${customer.name}`, margin, y); y += 6;
       doc.text(`Phone: ${customer.phone || "N/A"}`, margin, y); y += 6;
       doc.text(`Address: ${customer.address || "N/A"}`, margin, y); y += 6;
+
       doc.text(
-        `Statement Period: ${startDate ? format(new Date(startDate), "dd/MM/yyyy") : "All"} - ${endDate ? format(new Date(endDate), "dd/MM/yyyy") : "Current"}`,
+        `Statement Period: ${startDate || "All"} to ${endDate || "Current"}`,
         margin,
         y
       );
+
       y += 15;
 
-      doc.setFontSize(9).setFont("helvetica", "bold");
-      const colWidths = [
-        tableWidth * 0.15,
-        tableWidth * 0.25,
-        tableWidth * 0.10,
-        tableWidth * 0.15,
-        tableWidth * 0.15,
-        tableWidth * 0.20,
-      ];
-      const drawTableHeader = (yPos: number) => {
-        let colX = margin;
+      const colWidths = [25, 60, 25, 25, 25, 30];
+
+      const drawHeaders = () => {
+        let x = margin;
         const headers = ["Date", "Description", "Ref", "Debit", "Credit", "Balance"];
-        headers.forEach((header, i) => {
-          const align = i === 1 ? "left" : "center";
-          const offset = i === 1 ? 2 : colWidths[i] / 2;
-          doc.text(header, colX + offset, yPos, { align });
-          colX += colWidths[i];
+        doc.setFont("helvetica", "bold");
+
+        headers.forEach((h, i) => {
+          doc.text(h, x + 2, y);
+          x += colWidths[i];
         });
-        doc.setLineWidth(0.5);
-        doc.rect(margin, yPos - 5, tableWidth, 8);
-        colX = margin;
-        for (let i = 0; i < colWidths.length - 1; i++) {
-          colX += colWidths[i];
-          doc.line(colX, yPos - 5, colX, yPos + 3);
-        }
+
+        y += 5;
       };
-      drawTableHeader(y);
-      y += 2;
+
+      drawHeaders();
 
       doc.setFont("helvetica", "normal");
-      statement.forEach((entry) => {
-        const descLines = doc.splitTextToSize(entry.description, colWidths[1] - 4);
-        const rowHeight = Math.max(8, descLines.length * 5 + 4);
-        if (y + rowHeight > pageHeight - 30) {
+
+      statement.forEach(entry => {
+        const rowHeight = 8;
+
+        if (y + rowHeight > pageHeight - 20) {
           doc.addPage();
           y = 20;
-          drawTableHeader(y);
-          y += 8;
+          drawHeaders();
         }
-        let colX = margin;
-        const date = format(new Date(entry.date), "dd/MM/yyyy");
-        const reference = entry.reference.length > 8 ? entry.reference.slice(0, 6) + "..." : entry.reference;
-        const debitText = getNumberText(entry.debit);
-        const creditText = getNumberText(entry.credit);
-        const balanceText = getNumberText(entry.balance);
 
-        doc.text(date, colX + colWidths[0] / 2, y + 4, { align: "center" });
-        colX += colWidths[0];
-        descLines.forEach((line, i) => {
-          doc.text(line, colX + 2, y + 4 + i * 5);
-        });
-        colX += colWidths[1];
-        doc.text(reference, colX + colWidths[2] / 2, y + 4, { align: "center" });
-        colX += colWidths[2];
-        doc.setTextColor(255, 0, 0);
-        doc.text(debitText, colX + colWidths[3] / 2, y + 4, { align: "center" });
-        colX += colWidths[3];
-        doc.setTextColor(0, 128, 0);
-        doc.text(creditText, colX + colWidths[4] / 2, y + 4, { align: "center" });
-        colX += colWidths[4];
-        doc.setTextColor(0, 0, 0);
-        doc.setFont("helvetica", "bold");
-        doc.text(balanceText, colX + colWidths[5] / 2, y + 4, { align: "center" });
-        doc.setFont("helvetica", "normal");
-        colX = margin;
-        for (let i = 0; i < colWidths.length; i++) {
-          doc.rect(colX, y, colWidths[i], rowHeight);
-          colX += colWidths[i];
-        }
+        let x = margin;
+
+        doc.text(format(new Date(entry.date), "dd/MM/yyyy"), x + 2, y);
+        x += colWidths[0];
+
+        doc.text(doc.splitTextToSize(entry.description, colWidths[1] - 2), x + 2, y);
+        x += colWidths[1];
+
+        doc.text(entry.reference, x + 2, y);
+        x += colWidths[2];
+
+        doc.text(getText(entry.debit), x + 2, y);
+        x += colWidths[3];
+
+        doc.text(getText(entry.credit), x + 2, y);
+        x += colWidths[4];
+
+        doc.text(getText(entry.balance), x + 2, y);
+
         y += rowHeight;
       });
 
-      if (y + 30 > pageHeight - 20) {
-        doc.addPage();
-        y = 20;
-      }
-      y += 20;
-      doc.setFontSize(12).setFont("helvetica", "bold");
-      doc.text("Account Summary", margin, y); 
-      y += 15;
-      doc.setFillColor(249, 249, 249);
-      doc.rect(margin, y - 5, tableWidth, 20, "F");
-      doc.setFontSize(10).setFont("helvetica", "normal");
-      doc.text(
-        `Total Outstanding Balance: ${displayNumber(calculateTotalOutstanding())}`,
-        margin + 5,
-        y
-      );
-      y += 6;
-      doc.text(`Total Transactions: ${statement.length}`, margin + 5, y);
-
-      const pageCount = doc.getNumberOfPages();
-      for (let i = 1; i <= pageCount; i++) {
-        doc.setPage(i);
-        doc.setFontSize(8);
-        doc.text(`Page ${i} of ${pageCount}`, pageWidth - margin, pageHeight - 10, { align: "right" });
-      }
-      const pdfName = `customer-statement-${customer.name.replace(/\s+/g, "-").toLowerCase()}-${format(new Date(), "yyyy-MM-dd")}.pdf`;
+      const pdfName = `statement-${customer.name}.pdf`;
       const pdfBlob = doc.output("blob");
+
       saveAs(pdfBlob, pdfName);
+
       toast({
         title: "PDF Downloaded",
-        description: "Customer statement has been downloaded as PDF.",
+        description: "Customer statement saved successfully.",
       });
     } catch (error) {
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to generate PDF statement",
+        description: "Failed to generate PDF",
       });
     }
   };
@@ -377,116 +351,103 @@ const CustomerStatement: React.FC<CustomerStatementProps> = ({ customer }) => {
               <FileText className="h-5 w-5" />
               <CardTitle>Customer Statement</CardTitle>
             </div>
-            <Button onClick={(e) => { e.preventDefault(); exportToPDF(); }} variant="outline" size="sm">
+
+            <Button
+              onClick={(e) => {
+                e.preventDefault();
+                exportToPDF();
+              }}
+              variant="outline"
+              size="sm"
+            >
               <Download className="h-4 w-4 mr-2" />
               Export PDF
             </Button>
           </div>
         </CardHeader>
+
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            <div className="space-y-2">
-              <Label htmlFor="start-date">From Date</Label>
-              <Input
-                id="start-date"
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-              />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label>From Date</Label>
+              <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="end-date">To Date</Label>
-              <Input
-                id="end-date"
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-              />
+
+            <div>
+              <Label>To Date</Label>
+              <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
             </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <div className="text-center p-4 bg-blue-50 rounded-lg">
-              <div className="text-2xl font-bold text-blue-600">{loans.length}</div>
-              <div className="text-sm text-blue-600">Total Loans</div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+            <div className="p-4 bg-blue-50 rounded text-center">
+              <div className="text-xl font-bold">{loans.length}</div>
+              <div>Total Loans</div>
             </div>
-            <div className="text-center p-4 bg-green-50 rounded-lg">
-              <div className="text-2xl font-bold text-green-600">{transactions.length}</div>
-              <div className="text-sm text-green-600">Total Payments</div>
+
+            <div className="p-4 bg-green-50 rounded text-center">
+              <div className="text-xl font-bold">{transactions.length}</div>
+              <div>Total Payments</div>
             </div>
-            <div className="text-center p-4 bg-orange-50 rounded-lg">
-              <div className="text-2xl font-bold text-orange-600">{displayNumber(calculateTotalOutstanding())}</div>
-              <div className="text-sm text-orange-600">Outstanding Balance</div>
+
+            <div className="p-4 bg-orange-50 rounded text-center">
+              <div className="text-xl font-bold">
+                {displayNumber(calculateTotalOutstanding())}
+              </div>
+              <div>Outstanding Balance</div>
             </div>
           </div>
         </CardContent>
       </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>Transaction Statement</CardTitle>
         </CardHeader>
+
         <CardContent>
           {loading ? (
-            <div className="text-center py-8">Loading statement...</div>
+            <div className="py-8 text-center">Loading...</div>
           ) : statement.length > 0 ? (
             <div className="overflow-x-auto">
-              <table className="w-full border-collapse">
+              <table className="w-full">
                 <thead>
                   <tr className="border-b">
-                    <th className="text-left p-3 font-medium">Date</th>
-                    <th className="text-left p-3 font-medium">Description</th>
-                    <th className="text-left p-3 font-medium">Reference</th>
-                    <th className="text-right p-3 font-medium">Debit</th>
-                    <th className="text-right p-3 font-medium">Credit</th>
-                    <th className="text-right p-3 font-medium">Balance</th>
+                    <th className="p-3 text-left">Date</th>
+                    <th className="p-3 text-left">Description</th>
+                    <th className="p-3 text-left">Reference</th>
+                    <th className="p-3 text-right">Debit</th>
+                    <th className="p-3 text-right">Credit</th>
+                    <th className="p-3 text-right">Balance</th>
                   </tr>
                 </thead>
+
                 <tbody>
-                  {statement.map((entry, index) => (
-                    <tr key={index} className="border-b hover:bg-gray-50">
-                      <td className="p-3 text-sm">{format(new Date(entry.date), 'dd/MM/yyyy')}</td>
-                      <td className="p-3">
-                        <div className="flex items-center gap-2">
-                          <span>{entry.description}</span>
-                          <Badge
-                            variant={
-                              entry.type === 'loan_disbursement' ? 'destructive' :
-                              entry.type === 'payment_received' ? 'default' : 'secondary'
-                            }
-                            className="text-xs"
-                          >
-                            {entry.type === 'loan_disbursement' ? 'Loan' :
-                             entry.type === 'payment_received' ? 'Payment' : 'Interest'}
-                          </Badge>
-                        </div>
+                  {statement.map((entry, i) => (
+                    <tr key={i} className="border-b hover:bg-gray-50">
+                      <td className="p-3">{format(new Date(entry.date), 'dd/MM/yyyy')}</td>
+                      <td className="p-3">{entry.description}</td>
+                      <td className="p-3 text-gray-600">{entry.reference}</td>
+
+                      <td className="p-3 text-right text-red-600">
+                        {entry.debit > 0 ? displayNumber(entry.debit) : "-"}
                       </td>
-                      <td className="p-3 text-sm text-gray-600">{entry.reference}</td>
-                      <td className="p-3 text-right">
-                        {entry.debit > 0 ? (
-                          <span className="text-red-600 font-medium">
-                            {displayNumber(entry.debit)}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
+
+                      <td className="p-3 text-right text-green-600">
+                        {entry.credit > 0 ? displayNumber(entry.credit) : "-"}
                       </td>
-                      <td className="p-3 text-right">
-                        {entry.credit > 0 ? (
-                          <span className="text-green-600 font-medium">
-                            {displayNumber(entry.credit)}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">-</span>
-                        )}
+
+                      <td className="p-3 text-right font-bold">
+                        {displayNumber(entry.balance)}
                       </td>
-                      <td className="p-3 text-right font-medium">{displayNumber(entry.balance)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           ) : (
-            <div className="text-center py-8 text-gray-500">
-              No transactions found for the selected period
+            <div className="py-8 text-center text-gray-500">
+              No transactions found for selected date
             </div>
           )}
         </CardContent>
