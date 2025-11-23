@@ -59,19 +59,19 @@ export default function AdmissionEnquiry() {
 
       if (enquiriesError) throw enquiriesError;
 
-      // Fetch last follow-up for each enquiry
+      // Fetch all follow-ups for each enquiry
       const enquiriesWithFollowups = await Promise.all(
         (enquiriesData || []).map(async (enquiry) => {
           const { data: followups } = await supabase
             .from("admission_followups")
             .select("*")
             .eq("enquiry_id", enquiry.id)
-            .order("followup_date", { ascending: false })
-            .limit(1);
+            .order("followup_date", { ascending: false });
 
           return {
             ...enquiry,
             last_followup: followups?.[0] || null,
+            all_followups: followups || [],
           };
         })
       );
@@ -453,14 +453,52 @@ export default function AdmissionEnquiry() {
                                     <span className="text-sm font-medium text-muted-foreground">Course Name:</span>
                                     <p className="text-sm">{enquiry.course_name || "-"}</p>
                                   </div>
-                                  <div>
-                                    <span className="text-sm font-medium text-muted-foreground">Referred By:</span>
-                                    <p className="text-sm">{enquiry.referred_by || "-"}</p>
-                                  </div>
+                              <div>
+                                <span className="text-sm font-medium text-muted-foreground">Referred By:</span>
+                                <p className="text-sm">{enquiry.referred_by || "-"}</p>
+                              </div>
+                            </div>
+                            
+                            {enquiry.all_followups && enquiry.all_followups.length > 0 && (
+                              <div className="mt-4 pt-4 border-t">
+                                <h4 className="text-sm font-semibold mb-3">Follow-up History</h4>
+                                <div className="space-y-3">
+                                  {enquiry.all_followups.map((followup: any) => (
+                                    <div key={followup.id} className="bg-background/50 p-3 rounded-lg border">
+                                      <div className="flex justify-between items-start mb-2">
+                                        <div className="flex gap-4">
+                                          <div>
+                                            <span className="text-xs text-muted-foreground">Date:</span>
+                                            <p className="text-sm font-medium">{format(new Date(followup.followup_date), "dd/MM/yyyy")}</p>
+                                          </div>
+                                          <div>
+                                            <span className="text-xs text-muted-foreground">Type:</span>
+                                            <p className="text-sm">{followup.followup_type}</p>
+                                          </div>
+                                        </div>
+                                        {followup.next_followup_date && (
+                                          <div className="text-right">
+                                            <span className="text-xs text-muted-foreground">Next Follow-up:</span>
+                                            <p className="text-sm text-primary font-medium">
+                                              {format(new Date(followup.next_followup_date), "dd/MM/yyyy")}
+                                            </p>
+                                          </div>
+                                        )}
+                                      </div>
+                                      {followup.remark && (
+                                        <div>
+                                          <span className="text-xs text-muted-foreground">Remark:</span>
+                                          <p className="text-sm mt-1 whitespace-pre-wrap">{followup.remark}</p>
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
                                 </div>
                               </div>
-                            </TableCell>
-                          </TableRow>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
                         </CollapsibleContent>
                       </>
                     </Collapsible>

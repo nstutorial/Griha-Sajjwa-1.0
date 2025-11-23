@@ -67,6 +67,27 @@ export function EditChequeDialog({ open, onOpenChange, cheque, onSuccess }: Edit
     try {
       setLoading(true);
 
+      // Log status change if status has changed
+      if (status !== originalStatus) {
+        const { data: userData } = await supabase.auth.getUser();
+        
+        if (userData.user) {
+          const { error: historyError } = await supabase
+            .from('cheque_status_history')
+            .insert({
+              cheque_id: cheque.id,
+              old_status: originalStatus,
+              new_status: status,
+              changed_by: userData.user.id,
+              notes: notes || null,
+            });
+
+          if (historyError) {
+            console.error('Error logging status history:', historyError);
+          }
+        }
+      }
+
       // Update cheque status
       const { error: chequeError } = await supabase
         .from('cheques')

@@ -311,6 +311,47 @@ export type Database = {
           },
         ]
       }
+      cheque_status_history: {
+        Row: {
+          changed_at: string
+          changed_by: string
+          cheque_id: string
+          created_at: string
+          id: string
+          new_status: Database["public"]["Enums"]["cheque_status"]
+          notes: string | null
+          old_status: Database["public"]["Enums"]["cheque_status"] | null
+        }
+        Insert: {
+          changed_at?: string
+          changed_by: string
+          cheque_id: string
+          created_at?: string
+          id?: string
+          new_status: Database["public"]["Enums"]["cheque_status"]
+          notes?: string | null
+          old_status?: Database["public"]["Enums"]["cheque_status"] | null
+        }
+        Update: {
+          changed_at?: string
+          changed_by?: string
+          cheque_id?: string
+          created_at?: string
+          id?: string
+          new_status?: Database["public"]["Enums"]["cheque_status"]
+          notes?: string | null
+          old_status?: Database["public"]["Enums"]["cheque_status"] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cheque_status_history_cheque_id_fkey"
+            columns: ["cheque_id"]
+            isOneToOne: false
+            referencedRelation: "cheques"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cheques: {
         Row: {
           amount: number

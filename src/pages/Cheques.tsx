@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Plus, Edit, Trash2, TrendingUp, Clock, CheckCircle, XCircle } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Plus, Edit, Trash2, TrendingUp, Clock, CheckCircle, XCircle, Bell, FileText, History, CalendarDays } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { SidebarProvider, SidebarInset, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/AppSidebar';
 import { supabase } from '@/integrations/supabase/client';
@@ -20,6 +20,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { AddChequeDialog } from '@/components/AddChequeDialog';
 import { EditChequeDialog } from '@/components/EditChequeDialog';
+import { ChequeStatusHistory } from '@/components/ChequeStatusHistory';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -46,6 +47,8 @@ interface Cheque {
   party_name: string | null;
   notes: string | null;
   cleared_date: string | null;
+  firm_account_name?: string | null;
+  mahajan_name?: string | null;
 }
 
 export default function Cheques() {
@@ -57,6 +60,7 @@ export default function Cheques() {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
   const [selectedCheque, setSelectedCheque] = useState<Cheque | null>(null);
   const [chequeType, setChequeType] = useState<'received' | 'issued'>('received');
 
@@ -71,14 +75,28 @@ export default function Cheques() {
       setLoading(true);
       const { data, error } = await supabase
         .from('cheques')
-        .select('*')
+        .select(`
+          *,
+          firm_accounts (
+            account_name
+          ),
+          mahajans (
+            name
+          )
+        `)
         .eq('user_id', user?.id)
         .order('cheque_date', { ascending: false });
 
       if (error) throw error;
 
-      const received = data?.filter((c) => c.type === 'received') || [];
-      const issued = data?.filter((c) => c.type === 'issued') || [];
+      const chequesData = data?.map(cheque => ({
+        ...cheque,
+        firm_account_name: cheque.firm_accounts?.account_name || null,
+        mahajan_name: cheque.mahajans?.name || null,
+      })) || [];
+
+      const received = chequesData.filter((c) => c.type === 'received');
+      const issued = chequesData.filter((c) => c.type === 'issued');
       
       setReceivedCheques(received);
       setIssuedCheques(issued);
@@ -128,6 +146,7 @@ export default function Cheques() {
           <TableHead>Amount</TableHead>
           <TableHead>Bank</TableHead>
           {type === 'received' ? <TableHead>Party</TableHead> : <TableHead>Mahajan</TableHead>}
+          <TableHead>Firm Account</TableHead>
           <TableHead>Status</TableHead>
           <TableHead>Actions</TableHead>
         </TableRow>
@@ -135,7 +154,7 @@ export default function Cheques() {
       <TableBody>
         {cheques.length === 0 ? (
           <TableRow>
-            <TableCell colSpan={7} className="text-center text-muted-foreground">
+            <TableCell colSpan={8} className="text-center text-muted-foreground">
               No cheques found
             </TableCell>
           </TableRow>
@@ -146,10 +165,32 @@ export default function Cheques() {
               <TableCell>{new Date(cheque.cheque_date).toLocaleDateString()}</TableCell>
               <TableCell>₹{cheque.amount.toLocaleString()}</TableCell>
               <TableCell>{cheque.bank_name}</TableCell>
-              <TableCell>{cheque.party_name || '-'}</TableCell>
+              <TableCell>
+                {type === 'received' 
+                  ? (cheque.party_name || '-') 
+                  : (cheque.mahajan_name || '-')}
+              </TableCell>
+              <TableCell>
+                {cheque.firm_account_name ? (
+                  <span className="text-sm">{cheque.firm_account_name}</span>
+                ) : (
+                  <span className="text-muted-foreground">-</span>
+                )}
+              </TableCell>
               <TableCell>{getStatusBadge(cheque.status)}</TableCell>
               <TableCell>
                 <div className="flex gap-2">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => {
+                      setSelectedCheque(cheque);
+                      setHistoryDialogOpen(true);
+                    }}
+                    title="View Status History"
+                  >
+                    <History className="h-4 w-4" />
+                  </Button>
                   <Button
                     variant="ghost"
                     size="icon"
@@ -226,9 +267,41 @@ export default function Cheques() {
         <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4">
           <SidebarTrigger className="-ml-1" />
           <h1 className="text-xl font-semibold">Cheque Management</h1>
+          <div className="ml-auto flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => navigate('/cheque-reminders')}>
+              <Bell className="h-4 w-4 mr-2" />
+              Reminders
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => navigate('/cheque-reconciliation')}>
+              <FileText className="h-4 w-4 mr-2" />
+              Reconciliation
+            </Button>
+            <Button size="sm" onClick={() => setAddDialogOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add Cheque
+            </Button>
+          </div>
         </header>
 
         <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">
+          {/* Weekly View Card */}
+          <Card 
+            className="cursor-pointer hover:bg-accent transition-colors border-primary/20"
+            onClick={() => navigate('/cheques/weekly')}
+          >
+            <CardHeader>
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-primary/10 rounded-lg">
+                  <CalendarDays className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <CardTitle className="text-lg">Weekly Cheque Status</CardTitle>
+                  <CardDescription>View cheques organized by week with detailed status tracking</CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+          </Card>
+
           {/* Summary Cards */}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <Card>
@@ -336,6 +409,15 @@ export default function Cheques() {
           onOpenChange={setEditDialogOpen}
           cheque={selectedCheque}
           onSuccess={fetchCheques}
+        />
+      )}
+
+      {selectedCheque && (
+        <ChequeStatusHistory
+          open={historyDialogOpen}
+          onOpenChange={setHistoryDialogOpen}
+          chequeId={selectedCheque.id}
+          chequeNumber={selectedCheque.cheque_number}
         />
       )}
 

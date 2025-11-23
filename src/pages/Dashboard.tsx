@@ -31,6 +31,7 @@ import { TabSettings } from '@/pages/Settings';
 import { useToast } from '@/hooks/use-toast';
 import LoadingSpinner from '@/components/LoadingSpinner';
 import { useControl } from '@/contexts/ControlContext';
+import { ChequeReminderDialog } from '@/components/ChequeReminderDialog';
 
 interface DashboardStats {
   activeLoans: number;
@@ -52,6 +53,7 @@ const Dashboard = () => {
   });
   const [addLoanDialogOpen, setAddLoanDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('customers');
+  const [showChequeReminders, setShowChequeReminders] = useState(false);
   const [tabSettings, setTabSettings] = useState<TabSettings>({
     loans: true,
     customers: true,
@@ -205,6 +207,16 @@ const Dashboard = () => {
 
   useEffect(() => {
     fetchStats();
+  }, [user]);
+  
+  // Show cheque reminder dialog after login
+  useEffect(() => {
+    if (user) {
+      const timer = setTimeout(() => {
+        setShowChequeReminders(true);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
   }, [user]);
   
   // Show loading spinner while auth is loading
@@ -464,6 +476,12 @@ const Dashboard = () => {
           fetchStats();
           window.dispatchEvent(new CustomEvent('refresh-loans'));
         }}
+      />
+
+      {/* Cheque Reminder Dialog */}
+      <ChequeReminderDialog 
+        open={showChequeReminders} 
+        onOpenChange={setShowChequeReminders}
       />
     </div>
     </SidebarProvider>
