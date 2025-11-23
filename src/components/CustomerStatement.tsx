@@ -77,7 +77,7 @@ const CustomerStatement: React.FC<CustomerStatementProps> = ({ customer }) => {
   const [endDate, setEndDate] = useState<string>('');
   const [loading, setLoading] = useState(false);
 
-  // NEW STATE
+  // Toggle for description
   const [showFullDescription, setShowFullDescription] = useState(false);
 
   useEffect(() => {
@@ -212,6 +212,15 @@ const CustomerStatement: React.FC<CustomerStatementProps> = ({ customer }) => {
     return 0;
   };
 
+  // NEW: Calculate total interest for all loans
+  const calculateTotalInterest = () => {
+    return loans.reduce((sum, loan) => {
+      const balance = calculateLoanBalance(loan.id);
+      const interest = calculateInterest(loan, balance);
+      return sum + interest;
+    }, 0);
+  };
+
   const calculateTotalOutstanding = () => {
     return loans.reduce((sum, loan) => {
       const balance = calculateLoanBalance(loan.id);
@@ -227,15 +236,14 @@ const CustomerStatement: React.FC<CustomerStatementProps> = ({ customer }) => {
     }).format(amount);
   };
 
-  // Consistently show numbers WITHOUT currency symbols in UI & PDF
   const displayNumber = (amount: number) => removeSymbolsBeforeNumber(formatCurrency(amount));
 
-  // Helper: returns the full description, or with last 75 characters hidden
-const getDescriptionText = (desc: string) => {
-  if (showFullDescription || desc.length <= 75) return desc;
-  // Hide last 75 characters
-  return desc.slice(0, desc.length - 75);
-};
+  // Hide last 75 chars of description
+  const getDescriptionText = (desc: string) => {
+    if (showFullDescription || desc.length <= 75) return desc;
+    // Hide last 75 characters
+    return desc.slice(0, desc.length - 75);
+  };
 
   const exportToPDF = async () => {
     try {
@@ -350,8 +358,14 @@ const getDescriptionText = (desc: string) => {
       doc.text("Account Summary", margin, y); 
       y += 15;
       doc.setFillColor(249, 249, 249);
-      doc.rect(margin, y - 5, tableWidth, 20, "F");
+      doc.rect(margin, y - 5, tableWidth, 30, "F");
       doc.setFontSize(10).setFont("helvetica", "normal");
+      doc.text(
+        `Interest Amount: ${displayNumber(calculateTotalInterest())}`,
+        margin + 5,
+        y
+      );
+      y += 6;
       doc.text(
         `Total Outstanding Balance: ${displayNumber(calculateTotalOutstanding())}`,
         margin + 5,
@@ -438,9 +452,14 @@ const getDescriptionText = (desc: string) => {
         <CardHeader>
           <CardTitle>Transaction Statement</CardTitle>
           <div className="mt-2">
-           <Button onClick={() => setShowFullDescription(val => !val)}>
-            {showFullDescription ? 'Hide last 75 chars' : 'Show Full Description'}
-          </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowFullDescription(val => !val)}
+              className="px-2 py-1"
+            >
+              {showFullDescription ? 'Hide last 75 chars' : 'Show Full Description'}
+            </Button>
           </div>
         </CardHeader>
         <CardContent>
@@ -524,6 +543,13 @@ const getDescriptionText = (desc: string) => {
               No transactions found for the selected period
             </div>
           )}
+          {/* Account Summary Section */}
+          <div className="mt-8 p-4 bg-gray-50 rounded-lg w-full md:w-1/2">
+            <div className="text-lg font-semibold mb-2">Account Summary</div>
+            <div className="mb-1">Interest Amount: <span className="font-bold">{displayNumber(calculateTotalInterest())}</span></div>
+            <div className="mb-1">Total Outstanding Balance: <span className="font-bold">{displayNumber(calculateTotalOutstanding())}</span></div>
+            <div>Total Transactions: <span className="font-bold">{statement.length}</span></div>
+          </div>
         </CardContent>
       </Card>
     </div>
