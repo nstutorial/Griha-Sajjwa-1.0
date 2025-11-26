@@ -93,6 +93,14 @@ export default function Cheques() {
   // Auto-detect mobile
   const isMobile = window.innerWidth < 768;
 
+  const handleSettingsClick = () => {
+    navigate('/settings');
+  };
+
+  const handleProfileClick = () => {
+    navigate('/profile');
+  };
+
   useEffect(() => {
     if (user) fetchCheques();
   }, [user]);
@@ -359,7 +367,7 @@ export default function Cheques() {
   if (loading) {
     return (
       <SidebarProvider>
-        <AppSidebar />
+        <AppSidebar onSettingsClick={handleSettingsClick} onProfileClick={handleProfileClick} />
         <SidebarInset>
           <div className="flex justify-center p-8">Loading...</div>
         </SidebarInset>
@@ -369,7 +377,7 @@ export default function Cheques() {
 
   return (
     <SidebarProvider>
-      <AppSidebar />
+      <AppSidebar onSettingsClick={handleSettingsClick} onProfileClick={handleProfileClick} />
       <SidebarInset>
         {/* HEADER */}
         <header className="flex h-16 items-center gap-2 border-b px-3 md:px-4">

@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, Eye, EyeOff, ArrowLeft, FileText } from 'lucide-react';
+import { Plus, Eye, EyeOff, ArrowLeft, FileText, ArrowRightLeft } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { AddFirmAccountDialog } from '@/components/AddFirmAccountDialog';
+import { TransferBetweenAccountsDialog } from '@/components/TransferBetweenAccountsDialog';
 import { useNavigate } from 'react-router-dom';
 
 interface FirmAccount {
@@ -24,6 +25,8 @@ export default function FirmAccounts() {
   const [accounts, setAccounts] = useState<FirmAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [showTransferDialog, setShowTransferDialog] = useState(false);
+  const [selectedAccount, setSelectedAccount] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
     fetchAccounts();
@@ -95,6 +98,11 @@ export default function FirmAccounts() {
     navigate(`/firm-accounts/${accountId}`);
   };
 
+  const handleTransfer = (accountId: string, accountName: string) => {
+    setSelectedAccount({ id: accountId, name: accountName });
+    setShowTransferDialog(true);
+  };
+
   return (
     <div className="container mx-auto p-6">
       <div className="flex justify-between items-center mb-6">
@@ -155,15 +163,26 @@ export default function FirmAccounts() {
                 <p className="text-xs text-muted-foreground">
                   Status: {account.is_active ? 'Active' : 'Inactive'}
                 </p>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="w-full mt-2"
-                  onClick={() => handleViewStatement(account.id)}
-                >
-                  <FileText className="h-4 w-4 mr-2" />
-                  View Details
-                </Button>
+                <div className="flex gap-2 mt-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="flex-1"
+                    onClick={() => handleViewStatement(account.id)}
+                  >
+                    <FileText className="h-4 w-4 mr-2" />
+                    View Details
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="flex-1"
+                    onClick={() => handleTransfer(account.id, account.account_name)}
+                  >
+                    <ArrowRightLeft className="h-4 w-4 mr-2" />
+                    Transfer
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -183,6 +202,16 @@ export default function FirmAccounts() {
         onOpenChange={setShowAddDialog}
         onAccountAdded={fetchAccounts}
       />
+
+      {selectedAccount && (
+        <TransferBetweenAccountsDialog
+          open={showTransferDialog}
+          onOpenChange={setShowTransferDialog}
+          fromAccountId={selectedAccount.id}
+          fromAccountName={selectedAccount.name}
+          onTransferComplete={fetchAccounts}
+        />
+      )}
     </div>
   );
 }
