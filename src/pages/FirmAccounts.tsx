@@ -11,7 +11,6 @@ import { useNavigate } from 'react-router-dom';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
 import { AppSidebar } from '@/components/AppSidebar';
-import SettingsDialog from '@/components/SettingsDialog';
 
 interface FirmAccount {
   id: string;
@@ -34,7 +33,6 @@ export default function FirmAccounts() {
   const [showTransferDialog, setShowTransferDialog] = useState(false);
   const [showReceiveChequeDialog, setShowReceiveChequeDialog] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<{ id: string; name: string } | null>(null);
-  const [showSettingsDialog, setShowSettingsDialog] = useState(false);
   const [activeTab, setActiveTab] = useState('active');
 
   useEffect(() => {
@@ -251,7 +249,7 @@ export default function FirmAccounts() {
     <SidebarProvider>
       <div className="min-h-screen flex w-full">
         <AppSidebar 
-          onSettingsClick={() => setShowSettingsDialog(true)} 
+          onSettingsClick={() => navigate('/settings')} 
           onProfileClick={() => navigate('/profile')} 
         />
         <main className="flex-1">
@@ -343,11 +341,6 @@ export default function FirmAccounts() {
               onSuccess={fetchAccounts}
             />
 
-            <SettingsDialog
-              open={showSettingsDialog}
-              onOpenChange={setShowSettingsDialog}
-              onSettingsUpdate={() => {}}
-            />
           </div>
         </main>
       </div>
