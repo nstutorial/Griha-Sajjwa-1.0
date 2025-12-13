@@ -159,8 +159,8 @@ export default function FirmAccounts() {
   const renderAccountCard = (account: FirmAccount, index: number, list: FirmAccount[]) => (
     <Card key={account.id} className={!account.is_active ? 'opacity-60' : ''}>
       <CardHeader>
-        <CardTitle className="flex justify-between items-center">
-          <span>{account.account_name}</span>
+        <CardTitle className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+          <span className="break-words">{account.account_name}</span>
           <div className="flex items-center gap-1">
             <Button
               variant="ghost"
@@ -192,18 +192,18 @@ export default function FirmAccounts() {
         <div className="space-y-2">
           <p className="text-sm">
             <span className="font-medium">Type:</span>{' '}
-            <span className="capitalize">{account.account_type}</span>
+            <span className="capitalize break-words">{account.account_type}</span>
           </p>
           {account.account_type === 'bank' && (
             <>
               {account.bank_name && (
                 <p className="text-sm">
-                  <span className="font-medium">Bank:</span> {account.bank_name}
+                  <span className="font-medium">Bank:</span> <span className="break-words">{account.bank_name}</span>
                 </p>
               )}
               {account.account_number && (
                 <p className="text-sm">
-                  <span className="font-medium">Account #:</span> {account.account_number}
+                  <span className="font-medium">Account #:</span> <span className="break-words">{account.account_number}</span>
                 </p>
               )}
             </>
@@ -212,13 +212,13 @@ export default function FirmAccounts() {
             <span className="font-medium">Opening Balance:</span> ₹
             {account.opening_balance.toFixed(2)}
           </p>
-          <p className="text-lg font-bold">
+          <p className="text-lg font-bold break-words">
             Current Balance: ₹{account.current_balance.toFixed(2)}
           </p>
           <p className="text-xs text-muted-foreground">
             Status: {account.is_active ? 'Active' : 'Inactive'}
           </p>
-          <div className="flex gap-2 mt-2">
+          <div className="flex flex-row gap-2 mt-2">
             <Button
               variant="outline"
               size="sm"
@@ -256,16 +256,16 @@ export default function FirmAccounts() {
         />
         <main className="flex-1">
           <div className="container mx-auto p-6">
-            <div className="flex justify-between items-center mb-6">
-              <div className="flex items-center gap-4">
+            <div className="mb-6">
+              <div className="flex items-center gap-4 mb-4">
                 <SidebarTrigger>
                   <Button variant="ghost" size="icon">
                     <Menu className="h-5 w-5" />
                   </Button>
                 </SidebarTrigger>
-                <h1 className="text-3xl font-bold">Firm Accounts</h1>
+                <h1 className="text-2xl sm:text-3xl font-bold">Firm Accounts</h1>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <Button variant="outline" onClick={() => setShowReceiveChequeDialog(true)}>
                   <Banknote className="h-4 w-4 mr-2" />
                   Receive Money
