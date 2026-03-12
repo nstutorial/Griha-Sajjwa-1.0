@@ -35,7 +35,7 @@ export interface TabSettings {
 
 const HOME_ROUTE_OPTIONS = [
   { value: '/firm-accounts', label: 'Firm Accounts' },
-  { value: '/', label: 'Dashboard' },
+  { value: '/dashboard', label: 'Dashboard' },
   { value: '/reminders', label: 'Loan Reminders' },
   { value: '/bill-reminders', label: 'Bill Reminders' },
   { value: '/bill-customers', label: 'Bill Customers' },
